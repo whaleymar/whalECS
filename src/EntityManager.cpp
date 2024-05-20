@@ -1,4 +1,4 @@
-#include "ECS/Lib/ECS.h"
+#include "ECS.h"
 
 namespace whal::ecs {
 

@@ -1,4 +1,4 @@
-#include "ECS/Lib/ECS.h"
+#include "ECS.h"
 
 namespace whal::ecs {
 
@@ -18,7 +18,8 @@ void ECS::kill(Entity entity) {
 
 void ECS::killEntities() {
     for (auto entity : mToKill) {
-        mSystemManager->entityDestroyed(entity);  // this goes first so onRemove can fetch components before they're deallocated
+        mSystemManager->entityDestroyed(entity);  // this goes first so onRemove can fetch components before
+                                                  // they're deallocated
         mEntityManager->destroyEntity(entity);
         mComponentManager->entityDestroyed(entity);
     }

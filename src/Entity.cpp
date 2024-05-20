@@ -1,5 +1,5 @@
-#include "ECS/Lib/ECS.h"
-#include "Util/Expected.h"
+#include "ECS.h"
+#include "Expected.h"
 
 namespace whal::ecs {
 

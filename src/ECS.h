@@ -10,11 +10,11 @@
 #include <unordered_map>
 #include <vector>
 
-#include "Game/Events.h"
-#include "Systems/System.h"
-#include "Util/Expected.h"
-#include "Util/Traits.h"
-#include "Util/Types.h"
+#include "Expected.h"
+#include "Traits.h"
+
+typedef uint16_t u16;
+typedef uint32_t u32;
 
 namespace whal::ecs {
 
@@ -91,7 +91,8 @@ template <typename T>
 class ComponentArray : public IComponentArray {
 public:
     // TODO
-    // static_assert(std::is_trivial_v<T>, "Component is not trivial type (see https://en.cppreference.com/w/cpp/language/classes#Trivial_class)");
+    // static_assert(std::is_trivial_v<T>, "Component is not trivial type (see
+    // https://en.cppreference.com/w/cpp/language/classes#Trivial_class)");
     void addData(const Entity entity, T component) {
         if (mEntityToIndex.find(entity.id()) != mEntityToIndex.end()) {
             const u32 ix = mEntityToIndex[entity.id()];
@@ -322,7 +323,8 @@ public:
     Pattern getPattern() { return mPattern; }
 
 private:
-    // need a First and Second, otherwise there is ambiguity when there's only one element (InitializeIDs<type> vs InitializeIDs<type, <>>)
+    // need a First and Second, otherwise there is ambiguity when there's only one
+    // element (InitializeIDs<type> vs InitializeIDs<type, <>>)
     template <typename First, typename Second, typename... Rest>
     void InitializeIDs(std::vector<ComponentType>& componentTypes) {
         componentTypes.push_back(ComponentManager::getComponentID<First>());
@@ -358,7 +360,6 @@ public:
     }
 
     void entityDestroyed(const Entity entity) const {
-        System::eventMgr.triggerEvent(Event::DEATH_EVENT, entity);
         // TODO make thread safe
         for (const auto& system : mSystems) {
             auto const ix = system->getEntitiesVirtual().find(entity.id());
