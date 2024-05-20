@@ -4,8 +4,8 @@ This code is heavily based on this writeup: https://austinmorlan.com/posts/entit
 The main changes are:
 
 1. Does not rely on RTTI to make unique IDs for components/systems. Uses compile-time type IDs instead
-2. Single header (plus some cpp files) for an improved API
-3. Systems now have virtual onAdd and onDelete functions, which makes it easier to interact with non-ECS systems that interact w/ components. Logic for non-trivial component destructors should go in the onDelete function of a single-component system.
+2. Single header (plus some cpp files) for an improved API. Now components can be added with `entity.add<Transform>()` (default constructor) or `entity.add(transform)`. 
+3. Systems now have virtual onAdd and onDelete functions, which is my solution to running non-trivial constructors/destructors when components are created/destroyed.
 
 ## Constraints
 
@@ -24,7 +24,7 @@ The main changes are:
 - auto-call systems
     - system scheduler (every X frames / ongamestart / ongameend) + chaining (run sys1, then sys2; sys3 no dependencies so can thread)
 
-# Nice to have
+### Nice to have
 
 - Entity should have some compile() method which sets it Alive in the EntityManager and sends a patternChanged signal -> patternChanged signal (not sent for dead entities), which will prevent a bunch of patternChanged calls from happening while an entity is initialized
 - max entities/max components values should be macros which are optionally defined before the first time ECS.h is included, similar to rapidXML
