@@ -31,6 +31,9 @@ using Pattern = std::bitset<MAX_COMPONENTS>;
 
 using SystemId = u16;
 
+class Entity;
+using EntityDeathCallback = void (*)(Entity);
+
 class Entity {
 public:
     Entity() = default;
@@ -410,14 +413,6 @@ public:
         return instance;
     }
 
-    // move constructor
-    ECS(ECS&& src) {
-        mEntityManager = std::move(src.mEntityManager);
-        mComponentManager = std::move(src.mComponentManager);
-        mSystemManager = std::move(src.mSystemManager);
-        mToKill = std::move(src.mToKill);
-    }
-
     // ENTITY
     Expected<Entity> entity() const;
     void kill(Entity entity);
@@ -426,6 +421,7 @@ public:
     Expected<Entity> copy(Entity entity) const;
 
     u32 getEntityCount() const;
+    void setEntityDeathCallback(EntityDeathCallback callback);
 
     // COMPONENT
     template <typename T>
@@ -488,6 +484,7 @@ private:
     std::unique_ptr<ComponentManager> mComponentManager;
     std::unique_ptr<SystemManager> mSystemManager;
     std::vector<Entity> mToKill;
+    EntityDeathCallback mDeathCallback = nullptr;
 };
 
 template <typename T>

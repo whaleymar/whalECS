@@ -18,6 +18,9 @@ void ECS::kill(Entity entity) {
 
 void ECS::killEntities() {
     for (auto entity : mToKill) {
+        if (mDeathCallback != nullptr) {
+            mDeathCallback(entity);
+        }
         mSystemManager->entityDestroyed(entity);  // this goes first so onRemove can fetch components before
                                                   // they're deallocated
         mEntityManager->destroyEntity(entity);
@@ -43,6 +46,10 @@ Expected<Entity> ECS::copy(Entity prefab) const {
 
 u32 ECS::getEntityCount() const {
     return mEntityManager->getEntityCount();
+}
+
+void ECS::setEntityDeathCallback(EntityDeathCallback callback) {
+    mDeathCallback = callback;
 }
 
 }  // namespace whal::ecs
