@@ -410,6 +410,14 @@ public:
         return instance;
     }
 
+    // move constructor
+    ECS(ECS&& src) {
+        mEntityManager = std::move(src.mEntityManager);
+        mComponentManager = std::move(src.mComponentManager);
+        mSystemManager = std::move(src.mSystemManager);
+        mToKill = std::move(src.mToKill);
+    }
+
     // ENTITY
     Expected<Entity> entity() const;
     void kill(Entity entity);
@@ -471,9 +479,8 @@ public:
     }
 
 private:
-    ECS();
-
     // no copy
+    ECS();
     ECS(const ECS&) = delete;
     void operator=(const ECS&) = delete;
 
