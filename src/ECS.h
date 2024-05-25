@@ -78,6 +78,16 @@ private:
     EntityID mId = 0;
 };
 
+// utility class. Uses RAII to defer an entity's activation until it goes out of scope
+class DeferActivate {
+public:
+    DeferActivate(Entity entity) : mEntity(entity) {}
+    ~DeferActivate() { mEntity.activate(); }
+
+private:
+    Entity mEntity;
+};
+
 struct EntityHash {
     u32 operator()(ecs::Entity entity) const { return entity.id(); }
 };
