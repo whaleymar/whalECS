@@ -26,5 +26,4 @@ The main changes are:
 
 ### Nice to have
 
-- Entity should have some compile() method which sets it Alive in the EntityManager and sends a patternChanged signal -> patternChanged signal (not sent for dead entities), which will prevent a bunch of patternChanged calls from happening while an entity is initialized
 - max entities/max components values should be macros which are optionally defined before the first time ECS.h is included, similar to rapidXML

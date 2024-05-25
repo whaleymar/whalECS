@@ -8,8 +8,8 @@ ECS::ECS() {
     mSystemManager = std::make_unique<SystemManager>();
 }
 
-Expected<Entity> ECS::entity() const {
-    return mEntityManager->createEntity();
+Expected<Entity> ECS::entity(bool isAlive) const {
+    return mEntityManager->createEntity(isAlive);
 }
 
 void ECS::kill(Entity entity) {
@@ -30,18 +30,25 @@ void ECS::killEntities() {
 }
 
 Expected<Entity> ECS::copy(Entity prefab) const {
-    // this is probably quite slow
-    Expected<Entity> newEntity = entity();
+    Expected<Entity> newEntity = entity(false);
     if (!newEntity.isExpected()) {
         return newEntity;
     }
     mComponentManager->copyComponents(prefab, newEntity.value());
 
-    auto pattern = mEntityManager->getPattern(prefab);
-    mEntityManager->setPattern(newEntity.value(), pattern);
-    mSystemManager->entityPatternChanged(newEntity.value(), pattern);
+    // auto pattern = mEntityManager->getPattern(prefab);
+    // mEntityManager->setPattern(newEntity.value(), pattern);
+    // mSystemManager->entityPatternChanged(newEntity.value(), pattern);
+    newEntity.value().activate();
 
     return newEntity;
+}
+
+void ECS::activate(Entity entity) const {
+    if (mEntityManager->activate(entity)) {
+        auto pattern = mEntityManager->getPattern(entity);
+        mSystemManager->entityPatternChanged(entity, pattern);
+    }
 }
 
 u32 ECS::getEntityCount() const {
@@ -50,6 +57,10 @@ u32 ECS::getEntityCount() const {
 
 void ECS::setEntityDeathCallback(EntityDeathCallback callback) {
     mDeathCallback = callback;
+}
+
+bool ECS::isActive(Entity entity) const {
+    return mEntityManager->isActive(entity);
 }
 
 }  // namespace whal::ecs

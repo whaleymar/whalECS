@@ -6,19 +6,24 @@ EntityManager::EntityManager() {
     for (u32 entity = 0; entity < MAX_ENTITIES; entity++) {
         mAvailableIDs.push(entity);
     }
+    mActiveEntities.reset();
 }
 
-Expected<Entity> EntityManager::createEntity() {
+Expected<Entity> EntityManager::createEntity(bool isAlive) {
     if (mEntityCount + 1 >= MAX_ENTITIES) {
         return Expected<Entity>::error("Cannot allocate any more entities");
     }
     EntityID id = mAvailableIDs.front();
     mAvailableIDs.pop();
     mEntityCount++;
+    if (isAlive) {
+        mActiveEntities.set(static_cast<u32>(id));
+    }
     return Entity(id);
 }
 
 void EntityManager::destroyEntity(Entity entity) {
+    mActiveEntities.reset(static_cast<u32>(entity.id()));
     mPatterns[entity.mId].reset();  // invalidate pattern
     mAvailableIDs.push(entity.id());
     mEntityCount--;
@@ -30,6 +35,18 @@ void EntityManager::setPattern(Entity entity, Pattern pattern) {
 
 Pattern EntityManager::getPattern(Entity entity) const {
     return mPatterns[entity.mId];
+}
+
+bool EntityManager::isActive(Entity entity) const {
+    return mActiveEntities.test(static_cast<u32>(entity.id()));
+}
+
+bool EntityManager::activate(Entity entity) {
+    if (isActive(entity)) {
+        return false;
+    }
+    mActiveEntities.set(static_cast<u32>(entity.id()));
+    return true;
 }
 
 }  // namespace whal::ecs

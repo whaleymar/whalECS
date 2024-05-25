@@ -71,6 +71,7 @@ public:
 
     Expected<Entity> copy() const;
 
+    void activate() const;
     void kill() const;
 
 private:
@@ -174,15 +175,20 @@ class EntityManager {
 public:
     EntityManager();
 
-    Expected<Entity> createEntity();
+    Expected<Entity> createEntity(bool isAlive);
     void destroyEntity(Entity entity);
     void setPattern(Entity entity, Pattern pattern);
     Pattern getPattern(Entity entity) const;
     u32 getEntityCount() const { return mEntityCount; }
+    bool isActive(Entity entity) const;
+
+    // returns true if entity was activated, false if it was already active
+    bool activate(Entity entity);
 
 private:
     std::queue<EntityID> mAvailableIDs;
     std::array<Pattern, MAX_ENTITIES> mPatterns;
+    std::bitset<MAX_ENTITIES> mActiveEntities;
     u32 mEntityCount = 0;
 };
 
@@ -414,11 +420,12 @@ public:
     }
 
     // ENTITY
-    Expected<Entity> entity() const;
+    Expected<Entity> entity(bool isAlive = true) const;
     void kill(Entity entity);
     void killEntities();
 
     Expected<Entity> copy(Entity entity) const;
+    void activate(Entity entity) const;
 
     u32 getEntityCount() const;
     void setEntityDeathCallback(EntityDeathCallback callback);
@@ -431,7 +438,10 @@ public:
         auto pattern = mEntityManager->getPattern(entity);
         pattern.set(mComponentManager->getComponentType<T>(), true);
         mEntityManager->setPattern(entity, pattern);
-        mSystemManager->entityPatternChanged(entity, pattern);
+
+        if (isActive(entity)) {
+            mSystemManager->entityPatternChanged(entity, pattern);  // should always go after addComponent so onAdd can run w/out errors
+        }
     }
 
     template <typename T>
@@ -444,7 +454,9 @@ public:
         auto pattern = mEntityManager->getPattern(entity);
         pattern.set(mComponentManager->getComponentType<T>(), false);
         mEntityManager->setPattern(entity, pattern);
-        mSystemManager->entityPatternChanged(entity, pattern);
+        if (isActive(entity)) {
+            mSystemManager->entityPatternChanged(entity, pattern);  // should always go before removeComponent so we can run onRemove method
+        }
         mComponentManager->removeComponent<T>(entity);
     }
 
@@ -479,6 +491,9 @@ private:
     ECS();
     ECS(const ECS&) = delete;
     void operator=(const ECS&) = delete;
+
+    // is private because it's a bad idea to use this in game logic. An entity's ID could be recycled at any time
+    bool isActive(Entity entity) const;
 
     std::unique_ptr<EntityManager> mEntityManager;
     std::unique_ptr<ComponentManager> mComponentManager;
