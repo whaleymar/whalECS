@@ -5,6 +5,7 @@
 #include <bitset>
 #include <cassert>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <queue>
 #include <unordered_map>
@@ -199,6 +200,7 @@ private:
     std::queue<EntityID> mAvailableIDs;
     std::array<Pattern, MAX_ENTITIES> mPatterns;
     std::bitset<MAX_ENTITIES> mActiveEntities;
+    std::mutex mCreatorMutex;
     u32 mEntityCount = 0;
 };
 

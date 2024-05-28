@@ -1,3 +1,4 @@
+#include <mutex>
 #include "ECS.h"
 
 namespace whal::ecs {
@@ -10,6 +11,7 @@ EntityManager::EntityManager() {
 }
 
 Expected<Entity> EntityManager::createEntity(bool isAlive) {
+    std::unique_lock<std::mutex> lock{mCreatorMutex};
     if (mEntityCount + 1 >= MAX_ENTITIES) {
         return Expected<Entity>::error("Cannot allocate any more entities");
     }
