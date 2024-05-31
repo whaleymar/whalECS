@@ -9,6 +9,7 @@
 #include <optional>
 #include <queue>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "Expected.h"
@@ -510,7 +511,7 @@ private:
     std::unique_ptr<EntityManager> mEntityManager;
     std::unique_ptr<ComponentManager> mComponentManager;
     std::unique_ptr<SystemManager> mSystemManager;
-    std::vector<Entity> mToKill;
+    std::unordered_set<Entity, EntityHash> mToKill;
     EntityDeathCallback mDeathCallback = nullptr;
 };
 

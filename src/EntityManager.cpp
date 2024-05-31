@@ -1,3 +1,4 @@
+#include <iostream>
 #include <mutex>
 #include "ECS.h"
 
@@ -11,6 +12,7 @@ EntityManager::EntityManager() {
 }
 
 Expected<Entity> EntityManager::createEntity(bool isAlive) {
+    std::cout << "Entity count: " << mEntityCount << std::endl;
     std::unique_lock<std::mutex> lock{mCreatorMutex};
     if (mEntityCount + 1 >= MAX_ENTITIES) {
         return Expected<Entity>::error("Cannot allocate any more entities");
@@ -25,6 +27,11 @@ Expected<Entity> EntityManager::createEntity(bool isAlive) {
 }
 
 void EntityManager::destroyEntity(Entity entity) {
+    // #ifndef NDEBUG
+    //     u32 id = static_cast<u32>(entity.id());
+    //     auto back = mAvailableIDs.back();
+    //     assert(mActiveEntities.test(id) && back != entity.id() && "double deleted entity");
+    // #endif
     mActiveEntities.reset(static_cast<u32>(entity.id()));
     mPatterns[entity.mId].reset();  // invalidate pattern
     mAvailableIDs.push(entity.id());

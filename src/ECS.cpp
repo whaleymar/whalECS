@@ -13,7 +13,7 @@ Expected<Entity> ECS::entity(bool isAlive) const {
 }
 
 void ECS::kill(Entity entity) {
-    mToKill.push_back(entity);
+    mToKill.insert(entity);
 }
 
 void ECS::killEntities() {
@@ -36,9 +36,6 @@ Expected<Entity> ECS::copy(Entity prefab) const {
     }
     mComponentManager->copyComponents(prefab, newEntity.value());
 
-    // auto pattern = mEntityManager->getPattern(prefab);
-    // mEntityManager->setPattern(newEntity.value(), pattern);
-    // mSystemManager->entityPatternChanged(newEntity.value(), pattern);
     newEntity.value().activate();
 
     return newEntity;
