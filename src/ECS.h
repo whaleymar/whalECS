@@ -4,10 +4,12 @@
 #include <array>
 #include <bitset>
 #include <cassert>
+#include <concepts>
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <queue>
+#include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -319,10 +321,21 @@ public:
     friend SystemManager;
     virtual ~SystemBase() = default;
     virtual void update(){};
-    virtual void onAdd(const Entity){};
-    virtual void onRemove(const Entity){};
 
     virtual std::unordered_map<EntityID, Entity>& getEntitiesVirtual() = 0;  // only used by SystemManager
+};
+
+class IUpdateSystem {
+public:
+    virtual void update() = 0;
+};
+
+// could also do onActivated?
+class IMonitorSystem {
+public:
+    virtual void onAdd(const Entity entity) = 0;
+    // virtual void onModify(const Entity entity) = 0;
+    virtual void onRemove(const Entity entity) = 0;
 };
 
 // each system has a set of entities it operates on
@@ -362,6 +375,19 @@ private:
     Pattern mPattern;
 };
 
+// i fucking love concepts
+template <typename T, typename I>
+    requires std::derived_from<T, I>
+I* toInterfacePtr(T* ptr) {
+    return static_cast<I*>(ptr);
+}
+
+template <typename T, typename I>
+    requires(!std::derived_from<T, I>)
+I* toInterfacePtr(T* ptr) {
+    return nullptr;
+}
+
 class SystemManager {
 public:
     template <class T>
@@ -375,19 +401,25 @@ public:
 #endif
 
         mSystemIDs.push_back(id);
-        auto system = std::make_shared<T>();
+        std::shared_ptr<T> system = std::make_shared<T>();
         mPatterns.push_back(system->getPattern());
         mSystems.push_back(system);
+
+        mMonitorSystems.push_back(toInterfacePtr<T, IMonitorSystem>(system.get()));
+
         return system;
     }
 
     void entityDestroyed(const Entity entity) const {
         // TODO make thread safe
-        for (const auto& system : mSystems) {
+        for (size_t i = 0; i < mSystems.size(); i++) {
+            const auto& system = mSystems[i];
             auto const ix = system->getEntitiesVirtual().find(entity.id());
             if (ix != system->getEntitiesVirtual().end()) {
                 system->getEntitiesVirtual().erase(entity.id());
-                system->onRemove(entity);
+                if (mMonitorSystems[i] != nullptr) {
+                    mMonitorSystems[i]->onRemove(entity);
+                }
             }
         }
     }
@@ -403,9 +435,13 @@ public:
                     continue;
                 }
                 mSystems[i]->getEntitiesVirtual().insert({entity.id(), entity});
-                mSystems[i]->onAdd(entity);
+                if (mMonitorSystems[i] != nullptr) {
+                    mMonitorSystems[i]->onAdd(entity);
+                }
             } else if (ix != mSystems[i]->getEntitiesVirtual().end()) {
-                mSystems[i]->onRemove(entity);
+                if (mMonitorSystems[i] != nullptr) {
+                    mMonitorSystems[i]->onRemove(entity);
+                }
                 mSystems[i]->getEntitiesVirtual().erase(entity.id());
             }
         }
@@ -423,6 +459,7 @@ private:
     std::vector<SystemId> mSystemIDs;
     std::vector<Pattern> mPatterns;
     std::vector<std::shared_ptr<SystemBase>> mSystems;
+    std::vector<IMonitorSystem*> mMonitorSystems;
 };
 
 class ECS {

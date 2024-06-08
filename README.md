@@ -19,7 +19,7 @@ The main changes are:
 ### Need:
 
 - safer way to call entity.set(), because it currently circumvents the onRemove pattern I have, causing memory leaks for things with VAOs/VBOs/other manually deallocated stuff
-    - when entity.set() called, should call onRemove and onAdd for all systems i guess. Or just remove .set?
+    - when entity.set() called, should call an onModified method
 - thread-safe system methods
 - auto-call systems
     - system scheduler (every X frames / ongamestart / ongameend) + chaining (run sys1, then sys2; sys3 no dependencies so can thread)
