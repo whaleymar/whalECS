@@ -9,7 +9,6 @@
 #include <mutex>
 #include <optional>
 #include <queue>
-#include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -325,10 +324,10 @@ public:
     virtual std::unordered_map<EntityID, Entity>& getEntitiesVirtual() = 0;  // only used by SystemManager
 };
 
-class IUpdateSystem {
-public:
-    virtual void update() = 0;
-};
+// class IUpdateSystem {
+// public:
+//     virtual void update() = 0;
+// };
 
 // could also do onActivated?
 class IMonitorSystem {
@@ -390,8 +389,13 @@ I* toInterfacePtr(T* ptr) {
 
 class SystemManager {
 public:
+    enum Attributes : u16 {
+        UniqueEntity = 1,
+        Off = 1 << 1,
+    };
+
     template <class T>
-    std::shared_ptr<T> registerSystem() {
+    std::shared_ptr<T> registerSystem(u16 attributes = 0) {
         static_assert(is_base_of_template<ISystem, T>::value, "Cannot register class which doesn't inherit ISystem");
         const SystemId id = getSystemID<T>();
 
@@ -406,6 +410,7 @@ public:
         mSystems.push_back(system);
 
         mMonitorSystems.push_back(toInterfacePtr<T, IMonitorSystem>(system.get()));
+        mAttributes.push_back(attributes);
 
         return system;
     }
@@ -434,6 +439,8 @@ public:
                     // already in system
                     continue;
                 }
+                assert((!((mAttributes[i] & Attributes::UniqueEntity) > 0) || mSystems[i]->getEntitiesVirtual().size() < 1) &&
+                       "Trying to assign more than one entity to system with UniqueEntity attribute");
                 mSystems[i]->getEntitiesVirtual().insert({entity.id(), entity});
                 if (mMonitorSystems[i] != nullptr) {
                     mMonitorSystems[i]->onAdd(entity);
@@ -460,6 +467,7 @@ private:
     std::vector<Pattern> mPatterns;
     std::vector<std::shared_ptr<SystemBase>> mSystems;
     std::vector<IMonitorSystem*> mMonitorSystems;
+    std::vector<u16> mAttributes;
 };
 
 class ECS {
@@ -532,8 +540,8 @@ public:
 
     // SYSTEM
     template <typename T>
-    std::shared_ptr<T> registerSystem() const {
-        return mSystemManager->registerSystem<T>();
+    std::shared_ptr<T> registerSystem(u16 attributes = 0) const {
+        return mSystemManager->registerSystem<T>(attributes);
     }
 
 private:
