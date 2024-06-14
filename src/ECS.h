@@ -1,6 +1,5 @@
 #pragma once
 
-#include <algorithm>
 #include <array>
 #include <bitset>
 #include <cassert>
@@ -94,6 +93,17 @@ private:
 struct EntityHash {
     u32 operator()(ecs::Entity entity) const { return entity.id(); }
 };
+
+// std::find from <algorithm> so I don't have to include the whole thing
+template <class InputIterator, class T>
+InputIterator whal_find(InputIterator first, InputIterator last, const T& val) {
+    while (first != last) {
+        if (*first == val)
+            return first;
+        ++first;
+    }
+    return last;
+}
 
 // methods run in a loop by component manager need to be virtual
 class IComponentArray {
@@ -211,7 +221,7 @@ public:
     template <typename T>
     void registerComponent() {
         const ComponentType type = getComponentID<T>();
-        assert(std::find(mComponentTypes.begin(), mComponentTypes.end(), type) == mComponentTypes.end() && "Component type already registered");
+        assert(whal_find(mComponentTypes.begin(), mComponentTypes.end(), type) == mComponentTypes.end() && "Component type already registered");
         mComponentTypes.push_back(type);
         mComponentArrays.push_back(std::make_shared<ComponentArray<T>>());
     }
@@ -219,7 +229,7 @@ public:
     template <typename T>
     std::optional<ComponentType> tryGetComponentType() const {
         const ComponentType type = getComponentID<T>();
-        auto it = std::find(mComponentTypes.begin(), mComponentTypes.end(), type);
+        auto it = whal_find(mComponentTypes.begin(), mComponentTypes.end(), type);
         if (it == mComponentTypes.end()) {
             return std::nullopt;
         }
@@ -234,7 +244,7 @@ public:
     template <typename T>
     void addComponent(const Entity entity, T component) {
         const ComponentType type = getComponentID<T>();
-        auto it = std::find(mComponentTypes.begin(), mComponentTypes.end(), type);
+        auto it = whal_find(mComponentTypes.begin(), mComponentTypes.end(), type);
         int ix;
         if (it == mComponentTypes.end()) {
             registerComponent<T>();
@@ -248,7 +258,7 @@ public:
     template <typename T>
     void setComponent(const Entity entity, T component) {
         const ComponentType type = getComponentID<T>();
-        auto it = std::find(mComponentTypes.begin(), mComponentTypes.end(), type);
+        auto it = whal_find(mComponentTypes.begin(), mComponentTypes.end(), type);
         int ix = std::distance(mComponentTypes.begin(), it);
         getComponentArray<T>(ix)->setData(entity, component);
     }
@@ -256,7 +266,7 @@ public:
     template <typename T>
     void removeComponent(const Entity entity) const {
         const ComponentType type = getComponentID<T>();
-        auto it = std::find(mComponentTypes.begin(), mComponentTypes.end(), type);
+        auto it = whal_find(mComponentTypes.begin(), mComponentTypes.end(), type);
         if (it == mComponentTypes.end()) {
             return;
         }
@@ -267,7 +277,7 @@ public:
     template <typename T>
     bool hasComponent(const Entity entity) const {
         const ComponentType type = getComponentID<T>();
-        auto it = std::find(mComponentTypes.begin(), mComponentTypes.end(), type);
+        auto it = whal_find(mComponentTypes.begin(), mComponentTypes.end(), type);
         if (it == mComponentTypes.end()) {
             return false;
         }
@@ -278,7 +288,7 @@ public:
     template <typename T>
     std::optional<T*> tryGetComponent(const Entity entity) const {
         const ComponentType type = getComponentID<T>();
-        auto it = std::find(mComponentTypes.begin(), mComponentTypes.end(), type);
+        auto it = whal_find(mComponentTypes.begin(), mComponentTypes.end(), type);
         if (it == mComponentTypes.end()) {
             return std::nullopt;
         }
@@ -289,7 +299,7 @@ public:
     template <typename T>
     T& getComponent(const Entity entity) const {
         const ComponentType type = getComponentID<T>();
-        auto it = std::find(mComponentTypes.begin(), mComponentTypes.end(), type);
+        auto it = whal_find(mComponentTypes.begin(), mComponentTypes.end(), type);
         int ix = std::distance(mComponentTypes.begin(), it);
         return getComponentArray<T>(ix)->getData(entity);
     }
@@ -400,7 +410,7 @@ public:
         const SystemId id = getSystemID<T>();
 
 #ifndef NDEBUG  // avoid unused variable warning
-        auto it = std::find(mSystemIDs.begin(), mSystemIDs.end(), id);
+        auto it = whal_find(mSystemIDs.begin(), mSystemIDs.end(), id);
         assert(it == mSystemIDs.end() && "System already registered");
 #endif
 
