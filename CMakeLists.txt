@@ -12,6 +12,13 @@ file(GLOB_RECURSE SOURCES_BASE ${PROJECT_SOURCE_DIR}/src/*.cpp ${PROJECT_SOURCE_
 
 add_executable(whalECS ${SOURCES_BASE})
 
+target_include_directories(${PROJECT_NAME} 
+    PUBLIC src
+    PUBLIC "${PROJECT_SOURCE_DIR}/lib"
+)
+
+include_directories(lib)
+
 target_compile_options(whalECS PRIVATE -fno-rtti -fno-exceptions)
 target_compile_options(whalECS PRIVATE -Wall -Wextra -Wdeprecated)
 target_compile_options(whalECS PRIVATE -Wno-unused-parameter)

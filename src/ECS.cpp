@@ -3,9 +3,9 @@
 namespace whal::ecs {
 
 ECS::ECS() {
-    mComponentManager = std::make_unique<ComponentManager>();
-    mEntityManager = std::make_unique<EntityManager>();
-    mSystemManager = std::make_unique<SystemManager>();
+    mComponentManager = Corrade::Containers::pointer<ComponentManager>();
+    mEntityManager = Corrade::Containers::pointer<EntityManager>();
+    mSystemManager = Corrade::Containers::pointer<SystemManager>();
 }
 
 Expected<Entity> ECS::entity(bool isAlive) const {

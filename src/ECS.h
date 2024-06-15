@@ -4,13 +4,14 @@
 #include <bitset>
 #include <cassert>
 #include <concepts>
-#include <memory>
 #include <mutex>
-#include <optional>
 #include <queue>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+
+#include "CorradeOptional.h"
+#include "CorradePointer.h"
 
 #include "Expected.h"
 #include "Traits.h"
@@ -63,7 +64,7 @@ public:
     void remove();
 
     template <typename T>
-    std::optional<T*> tryGet() const;
+    Corrade::Containers::Optional<T*> tryGet() const;
 
     template <typename T>
     T& get() const;
@@ -159,9 +160,9 @@ public:
 
     bool hasData(const Entity entity) const { return mEntityToIndex.find(entity.id()) != mEntityToIndex.end(); }
 
-    std::optional<T*> tryGetData(const Entity entity) {
+    Corrade::Containers::Optional<T*> tryGetData(const Entity entity) {
         if (mEntityToIndex.find(entity.id()) == mEntityToIndex.end()) {
-            return std::nullopt;
+            return Corrade::Containers::NullOpt;
         }
         const u32 ix = mEntityToIndex.at(entity.id());
         return &mComponentTable.at(ix);
@@ -223,15 +224,16 @@ public:
         const ComponentType type = getComponentID<T>();
         assert(whal_find(mComponentTypes.begin(), mComponentTypes.end(), type) == mComponentTypes.end() && "Component type already registered");
         mComponentTypes.push_back(type);
-        mComponentArrays.push_back(std::make_shared<ComponentArray<T>>());
+        mComponentArrays.push_back(Corrade::Containers::pointer<ComponentArray<T>>());
     }
 
     template <typename T>
-    std::optional<ComponentType> tryGetComponentType() const {
+    Corrade::Containers::Optional<ComponentType> tryGetComponentType() const {
         const ComponentType type = getComponentID<T>();
         auto it = whal_find(mComponentTypes.begin(), mComponentTypes.end(), type);
         if (it == mComponentTypes.end()) {
-            return std::nullopt;
+            return Corrade::Containers::NullOpt;
+            // return std::nullopt;
         }
         return type;
     }
@@ -286,11 +288,12 @@ public:
     }
 
     template <typename T>
-    std::optional<T*> tryGetComponent(const Entity entity) const {
+    Corrade::Containers::Optional<T*> tryGetComponent(const Entity entity) const {
         const ComponentType type = getComponentID<T>();
         auto it = whal_find(mComponentTypes.begin(), mComponentTypes.end(), type);
         if (it == mComponentTypes.end()) {
-            return std::nullopt;
+            return Corrade::Containers::NullOpt;
+            // return std::nullopt;
         }
         int ix = std::distance(mComponentTypes.begin(), it);
         return getComponentArray<T>(ix)->tryGetData(entity);
@@ -317,12 +320,12 @@ public:
 
 private:
     template <typename T>
-    std::shared_ptr<ComponentArray<T>> getComponentArray(int ix) const {
-        return std::static_pointer_cast<ComponentArray<T>>(mComponentArrays[ix]);
+    ComponentArray<T>* getComponentArray(int ix) const {
+        return static_cast<ComponentArray<T>*>(mComponentArrays[ix].get());
     }
 
     std::vector<ComponentType> mComponentTypes;
-    std::vector<std::shared_ptr<IComponentArray>> mComponentArrays;
+    std::vector<Corrade::Containers::Pointer<IComponentArray>> mComponentArrays;
 };
 
 class SystemBase {
@@ -405,7 +408,7 @@ public:
     };
 
     template <class T>
-    std::shared_ptr<T> registerSystem(u16 attributes = 0) {
+    T* registerSystem(u16 attributes = 0) {
         static_assert(is_base_of_template<ISystem, T>::value, "Cannot register class which doesn't inherit ISystem");
         const SystemId id = getSystemID<T>();
 
@@ -415,14 +418,15 @@ public:
 #endif
 
         mSystemIDs.push_back(id);
-        std::shared_ptr<T> system = std::make_shared<T>();
+        Corrade::Containers::Pointer<T> system = Corrade::Containers::pointer<T>();
         mPatterns.push_back(system->getPattern());
-        mSystems.push_back(system);
 
         mMonitorSystems.push_back(toInterfacePtr<T, IMonitorSystem>(system.get()));
         mAttributes.push_back(attributes);
 
-        return system;
+        T* rawPtr = system.get();
+        mSystems.push_back(std::move(system));
+        return rawPtr;
     }
 
     void entityDestroyed(const Entity entity) const {
@@ -475,7 +479,7 @@ private:
 
     std::vector<SystemId> mSystemIDs;
     std::vector<Pattern> mPatterns;
-    std::vector<std::shared_ptr<SystemBase>> mSystems;
+    std::vector<Corrade::Containers::Pointer<SystemBase>> mSystems;
     std::vector<IMonitorSystem*> mMonitorSystems;
     std::vector<u16> mAttributes;
 };
@@ -534,7 +538,7 @@ public:
     }
 
     template <typename T>
-    std::optional<T*> tryGetComponent(const Entity entity) const {
+    Corrade::Containers::Optional<T*> tryGetComponent(const Entity entity) const {
         return mComponentManager->tryGetComponent<T>(entity);
     }
 
@@ -550,7 +554,7 @@ public:
 
     // SYSTEM
     template <typename T>
-    std::shared_ptr<T> registerSystem(u16 attributes = 0) const {
+    T* registerSystem(u16 attributes = 0) const {
         return mSystemManager->registerSystem<T>(attributes);
     }
 
@@ -563,9 +567,9 @@ private:
     // is private because it's a bad idea to use this in game logic. An entity's ID could be recycled at any time
     bool isActive(Entity entity) const;
 
-    std::unique_ptr<EntityManager> mEntityManager;
-    std::unique_ptr<ComponentManager> mComponentManager;
-    std::unique_ptr<SystemManager> mSystemManager;
+    Corrade::Containers::Pointer<EntityManager> mEntityManager;
+    Corrade::Containers::Pointer<ComponentManager> mComponentManager;
+    Corrade::Containers::Pointer<SystemManager> mSystemManager;
     std::unordered_set<Entity, EntityHash> mToKill;
     EntityDeathCallback mDeathCallback = nullptr;
 };
@@ -591,7 +595,7 @@ void Entity::remove() {
 }
 
 template <typename T>
-std::optional<T*> Entity::tryGet() const {
+Corrade::Containers::Optional<T*> Entity::tryGet() const {
     return ECS::getInstance().tryGetComponent<T>(*this);
 }
 
