@@ -58,7 +58,7 @@ public:
 
     // set value of component that's been added
     template <typename T>
-    void set(T component);
+    void set(T component) const;
 
     template <typename T>
     void remove();
@@ -585,7 +585,7 @@ void Entity::add() {
 }
 
 template <typename T>
-void Entity::set(T component) {
+void Entity::set(T component) const {
     ECS::getInstance().setComponent<T>(*this, component);
 }
 
