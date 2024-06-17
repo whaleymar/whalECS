@@ -484,10 +484,10 @@ private:
     std::vector<u16> mAttributes;
 };
 
-class ECS {
+class World {
 public:
-    inline static ECS& getInstance() {
-        static ECS instance;
+    inline static World& getInstance() {
+        static World instance;
         return instance;
     }
 
@@ -560,9 +560,9 @@ public:
 
 private:
     // no copy
-    ECS();
-    ECS(const ECS&) = delete;
-    void operator=(const ECS&) = delete;
+    World();
+    World(const World&) = delete;
+    void operator=(const World&) = delete;
 
     // is private because it's a bad idea to use this in game logic. An entity's ID could be recycled at any time
     bool isActive(Entity entity) const;
@@ -576,37 +576,37 @@ private:
 
 template <typename T>
 void Entity::add(T component) {
-    ECS::getInstance().addComponent<T>(*this, component);
+    World::getInstance().addComponent<T>(*this, component);
 }
 
 template <typename T>
 void Entity::add() {
-    ECS::getInstance().addComponent<T>(*this, T());
+    World::getInstance().addComponent<T>(*this, T());
 }
 
 template <typename T>
 void Entity::set(T component) const {
-    ECS::getInstance().setComponent<T>(*this, component);
+    World::getInstance().setComponent<T>(*this, component);
 }
 
 template <typename T>
 void Entity::remove() {
-    ECS::getInstance().removeComponent<T>(*this);
+    World::getInstance().removeComponent<T>(*this);
 }
 
 template <typename T>
 Corrade::Containers::Optional<T*> Entity::tryGet() const {
-    return ECS::getInstance().tryGetComponent<T>(*this);
+    return World::getInstance().tryGetComponent<T>(*this);
 }
 
 template <typename T>
 T& Entity::get() const {
-    return ECS::getInstance().getComponent<T>(*this);
+    return World::getInstance().getComponent<T>(*this);
 }
 
 template <typename T>
 bool Entity::has() const {
-    return ECS::getInstance().hasComponent<T>(*this);
+    return World::getInstance().hasComponent<T>(*this);
 }
 
 }  // namespace whal::ecs

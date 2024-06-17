@@ -2,21 +2,21 @@
 
 namespace whal::ecs {
 
-ECS::ECS() {
+World::World() {
     mComponentManager = Corrade::Containers::pointer<ComponentManager>();
     mEntityManager = Corrade::Containers::pointer<EntityManager>();
     mSystemManager = Corrade::Containers::pointer<SystemManager>();
 }
 
-Expected<Entity> ECS::entity(bool isAlive) const {
+Expected<Entity> World::entity(bool isAlive) const {
     return mEntityManager->createEntity(isAlive);
 }
 
-void ECS::kill(Entity entity) {
+void World::kill(Entity entity) {
     mToKill.insert(entity);
 }
 
-void ECS::killEntities() {
+void World::killEntities() {
     for (auto entity : mToKill) {
         if (mDeathCallback != nullptr) {
             mDeathCallback(entity);
@@ -29,7 +29,7 @@ void ECS::killEntities() {
     mToKill.clear();
 }
 
-Expected<Entity> ECS::copy(Entity prefab) const {
+Expected<Entity> World::copy(Entity prefab) const {
     Expected<Entity> newEntity = entity(false);
     if (!newEntity.isExpected()) {
         return newEntity;
@@ -41,22 +41,22 @@ Expected<Entity> ECS::copy(Entity prefab) const {
     return newEntity;
 }
 
-void ECS::activate(Entity entity) const {
+void World::activate(Entity entity) const {
     if (mEntityManager->activate(entity)) {
         auto pattern = mEntityManager->getPattern(entity);
         mSystemManager->entityPatternChanged(entity, pattern);
     }
 }
 
-u32 ECS::getEntityCount() const {
+u32 World::getEntityCount() const {
     return mEntityManager->getEntityCount();
 }
 
-void ECS::setEntityDeathCallback(EntityDeathCallback callback) {
+void World::setEntityDeathCallback(EntityDeathCallback callback) {
     mDeathCallback = callback;
 }
 
-bool ECS::isActive(Entity entity) const {
+bool World::isActive(Entity entity) const {
     return mEntityManager->isActive(entity);
 }
 

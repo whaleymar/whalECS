@@ -6,15 +6,15 @@ namespace whal::ecs {
 Entity::Entity(EntityID id) : mId(id){};
 
 Expected<Entity> Entity::copy() const {
-    return ECS::getInstance().copy(*this);
+    return World::getInstance().copy(*this);
 }
 
 void Entity::kill() const {
-    ECS::getInstance().kill(*this);
+    World::getInstance().kill(*this);
 }
 
 void Entity::activate() const {
-    ECS::getInstance().activate(*this);
+    World::getInstance().activate(*this);
 }
 
 }  // namespace whal::ecs
