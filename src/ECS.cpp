@@ -17,7 +17,10 @@ void World::kill(Entity entity) {
 }
 
 void World::killEntities() {
-    for (auto entity : mToKill) {
+    // copy mToKill in case onRemove callbacks kill more entities
+    auto tmpToKill = std::move(mToKill);
+    mToKill.clear();
+    for (auto entity : tmpToKill) {
         if (mDeathCallback != nullptr) {
             mDeathCallback(entity);
         }
@@ -26,7 +29,6 @@ void World::killEntities() {
         mEntityManager->destroyEntity(entity);
         mComponentManager->entityDestroyed(entity);
     }
-    mToKill.clear();
 }
 
 Expected<Entity> World::copy(Entity prefab) const {
