@@ -24,8 +24,8 @@ void World::killEntities() {
         if (mDeathCallback != nullptr) {
             mDeathCallback(entity);
         }
-        mSystemManager->entityDestroyed(entity);  // this goes first so onRemove can fetch components before
-                                                  // they're deallocated
+        mSystemManager->onEntityDestroyed(entity);  // this goes first so onRemove can fetch components before
+                                                    // they're deallocated
         mEntityManager->destroyEntity(entity);
         mComponentManager->entityDestroyed(entity);
     }
@@ -46,7 +46,7 @@ Expected<Entity> World::copy(Entity prefab) const {
 void World::activate(Entity entity) const {
     if (mEntityManager->activate(entity)) {
         auto pattern = mEntityManager->getPattern(entity);
-        mSystemManager->entityPatternChanged(entity, pattern);
+        mSystemManager->onEntityPatternChanged(entity, pattern);
     }
 }
 

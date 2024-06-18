@@ -337,6 +337,7 @@ public:
     virtual std::unordered_map<EntityID, Entity>& getEntitiesVirtual() = 0;  // only used by SystemManager
 };
 
+// once implemented, don't run for IPausableSystems if world paused
 // class IUpdateSystem {
 // public:
 //     virtual void update() = 0;
@@ -346,8 +347,14 @@ public:
 class IMonitorSystem {
 public:
     virtual void onAdd(const Entity entity) = 0;
-    // virtual void onModify(const Entity entity) = 0;
+    // virtual void onModify(const Entity entity) = 0; // TODO
     virtual void onRemove(const Entity entity) = 0;
+};
+
+class IPausableSystem {
+public:
+    virtual void onPause() = 0;
+    virtual void onUnpause() = 0;
 };
 
 // each system has a set of entities it operates on
@@ -422,6 +429,7 @@ public:
         mPatterns.push_back(system->getPattern());
 
         mMonitorSystems.push_back(toInterfacePtr<T, IMonitorSystem>(system.get()));
+        mPauseSystems.push_back(toInterfacePtr<T, IPausableSystem>(system.get()));
         mAttributes.push_back(attributes);
 
         T* rawPtr = system.get();
@@ -429,7 +437,7 @@ public:
         return rawPtr;
     }
 
-    void entityDestroyed(const Entity entity) const {
+    void onEntityDestroyed(const Entity entity) const {
         // TODO make thread safe
         for (size_t i = 0; i < mSystems.size(); i++) {
             const auto& system = mSystems[i];
@@ -443,7 +451,7 @@ public:
         }
     }
 
-    void entityPatternChanged(const Entity entity, const Pattern newEntityPattern) const {
+    void onEntityPatternChanged(const Entity entity, const Pattern newEntityPattern) const {
         // TODO make thread safe
         for (size_t i = 0; i < mSystemIDs.size(); i++) {
             auto const& systemPattern = mPatterns[i];
@@ -468,6 +476,28 @@ public:
         }
     }
 
+    void onPaused() {
+        assert(!mIsWorldPaused);
+
+        mIsWorldPaused = true;
+        for (auto pSystem : mPauseSystems) {
+            if (pSystem) {
+                pSystem->onPause();
+            }
+        }
+    }
+
+    void onUnpaused() {
+        assert(mIsWorldPaused);
+
+        mIsWorldPaused = false;
+        for (auto pSystem : mPauseSystems) {
+            if (pSystem) {
+                pSystem->onUnpause();
+            }
+        }
+    }
+
 private:
     // assign unique IDs to each system type
     static inline SystemId SystemID = 0;
@@ -481,7 +511,9 @@ private:
     std::vector<Pattern> mPatterns;
     std::vector<Corrade::Containers::Pointer<SystemBase>> mSystems;
     std::vector<IMonitorSystem*> mMonitorSystems;
+    std::vector<IPausableSystem*> mPauseSystems;
     std::vector<u16> mAttributes;
+    bool mIsWorldPaused = false;
 };
 
 class World {
@@ -512,7 +544,7 @@ public:
         mEntityManager->setPattern(entity, pattern);
 
         if (isActive(entity)) {
-            mSystemManager->entityPatternChanged(entity, pattern);  // should always go after addComponent so onAdd can run w/out errors
+            mSystemManager->onEntityPatternChanged(entity, pattern);  // should always go after addComponent so onAdd can run w/out errors
         }
     }
 
@@ -527,7 +559,7 @@ public:
         pattern.set(mComponentManager->getComponentType<T>(), false);
         mEntityManager->setPattern(entity, pattern);
         if (isActive(entity)) {
-            mSystemManager->entityPatternChanged(entity, pattern);  // should always go before removeComponent so we can run onRemove method
+            mSystemManager->onEntityPatternChanged(entity, pattern);  // should always go before removeComponent so we can run onRemove method
         }
         mComponentManager->removeComponent<T>(entity);
     }
@@ -557,6 +589,10 @@ public:
     T* registerSystem(u16 attributes = 0) const {
         return mSystemManager->registerSystem<T>(attributes);
     }
+
+    void pause() const { mSystemManager->onPaused(); }
+
+    void unpause() const { mSystemManager->onUnpaused(); }
 
 private:
     // no copy
