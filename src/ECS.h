@@ -25,10 +25,10 @@ class EntityManager;
 class SystemManager;
 
 using EntityID = u32;
-const u32 MAX_ENTITIES = 5000;
+constexpr u32 MAX_ENTITIES = 5000;
 
 using ComponentType = u16;
-const ComponentType MAX_COMPONENTS = 64;
+constexpr ComponentType MAX_COMPONENTS = 64;
 
 using Pattern = std::bitset<MAX_COMPONENTS>;
 
@@ -337,6 +337,17 @@ public:
     virtual std::unordered_map<EntityID, Entity>& getEntitiesVirtual() = 0;  // only used by SystemManager
 };
 
+// might combine these two? not sure who would use it
+// class IWorldStartSystem {
+// public:
+//     virtual void onStart() = 0;
+// };
+//
+// class IWorldEndSystem {
+// public:
+//     virtual void onEnd() = 0;
+// };
+
 // once implemented, don't run for IPausableSystems if world paused
 // class IUpdateSystem {
 // public:
@@ -380,13 +391,13 @@ private:
     // need a First and Second, otherwise there is ambiguity when there's only one
     // element (InitializeIDs<type> vs InitializeIDs<type, <>>)
     template <typename First, typename Second, typename... Rest>
-    void InitializeIDs(std::vector<ComponentType>& componentTypes) {
+    static void InitializeIDs(std::vector<ComponentType>& componentTypes) {
         componentTypes.push_back(ComponentManager::getComponentID<First>());
         InitializeIDs<Second, Rest...>(componentTypes);
     }
 
     template <typename Last>
-    void InitializeIDs(std::vector<ComponentType>& componentTypes) {
+    static void InitializeIDs(std::vector<ComponentType>& componentTypes) {
         componentTypes.push_back(ComponentManager::getComponentID<Last>());
     }
 
