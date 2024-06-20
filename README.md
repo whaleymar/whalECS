@@ -5,7 +5,8 @@ The main changes are:
 
 1. Does not rely on RTTI to make unique IDs for components/systems. Uses compile-time type IDs instead
 2. Single header (plus some cpp files) for an improved API. Now components can be added with `entity.add<Transform>()` (default constructor) or `entity.add(transform)`. 
-3. Systems now have virtual onAdd and onDelete functions, which is my solution to running non-trivial constructors/destructors when components are created/destroyed.
+3. Several Attributes/Interfaces for Systems to inherit for complex behavior
+4. Automatic schedule system updates
 
 ## Constraints
 
@@ -18,11 +19,8 @@ The main changes are:
 
 ### Need:
 
-- safer way to call entity.set(), because it currently circumvents the onRemove pattern I have, causing memory leaks for things with VAOs/VBOs/other manually deallocated stuff
-    - when entity.set() called, should call an onModified method
+- onModify virtual method for IMonitor systems: safer way to call entity.set(), because it currently circumvents the onRemove pattern I have, causing memory leaks for things with VAOs/VBOs/other manually deallocated stuff
 - thread-safe system methods
-- auto-call systems
-    - system scheduler (every X frames / ongamestart / ongameend) + chaining (run sys1, then sys2; sys3 no dependencies so can thread)
 
 ### Nice to have
 

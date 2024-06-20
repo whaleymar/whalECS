@@ -332,7 +332,6 @@ class SystemBase {
 public:
     friend SystemManager;
     virtual ~SystemBase() = default;
-    virtual void update(){};
 
     virtual std::unordered_map<EntityID, Entity>& getEntitiesVirtual() = 0;  // only used by SystemManager
 };
@@ -348,11 +347,10 @@ public:
 //     virtual void onEnd() = 0;
 // };
 
-// once implemented, don't run for IPausableSystems if world paused
-// class IUpdateSystem {
-// public:
-//     virtual void update() = 0;
-// };
+class IFixedUpdate {
+public:
+    virtual void fixedUpdate() = 0;
+};
 
 // could also do onActivated?
 class IMonitorSystem {
@@ -362,11 +360,14 @@ public:
     virtual void onRemove(const Entity entity) = 0;
 };
 
-class IPausableSystem {
+class IReactToPause {
 public:
     virtual void onPause() = 0;
     virtual void onUnpause() = 0;
 };
+
+class AttrUniqueEntity {};
+class AttrUpdateDuringPause {};
 
 // each system has a set of entities it operates on
 // currently their methods are called manually
@@ -422,30 +423,97 @@ class SystemManager {
 public:
     enum Attributes : u16 {
         UniqueEntity = 1,
-        Off = 1 << 1,
+        UpdateDuringPause = 1 << 1,
     };
+
+    template <class T>
+    T* getSystem() const {
+        const SystemId id = getSystemID<T>();
+        assert(mSystemIdToIndex.contains(id) && "System not registered");
+
+        return static_cast<T*>(mSystems[mSystemIdToIndex.at(id)].get());
+    }
 
     template <class T>
     T* registerSystem(u16 attributes = 0) {
         static_assert(is_base_of_template<ISystem, T>::value, "Cannot register class which doesn't inherit ISystem");
         const SystemId id = getSystemID<T>();
+        assert(!mSystemIdToIndex.contains(id) && "System already registered");
 
-#ifndef NDEBUG  // avoid unused variable warning
-        auto it = whal_find(mSystemIDs.begin(), mSystemIDs.end(), id);
-        assert(it == mSystemIDs.end() && "System already registered");
-#endif
+        mSystemIdToIndex.insert({id, mSystems.size()});
 
-        mSystemIDs.push_back(id);
         Corrade::Containers::Pointer<T> system = Corrade::Containers::pointer<T>();
         mPatterns.push_back(system->getPattern());
 
+        mUpdateSystems.push_back(toInterfacePtr<T, IFixedUpdate>(system.get()));
         mMonitorSystems.push_back(toInterfacePtr<T, IMonitorSystem>(system.get()));
-        mPauseSystems.push_back(toInterfacePtr<T, IPausableSystem>(system.get()));
+        mPauseSystems.push_back(toInterfacePtr<T, IReactToPause>(system.get()));
+
+        // check attributes
+        if (toInterfacePtr<T, AttrUniqueEntity>(system.get())) {
+            attributes |= UniqueEntity;
+        }
+        if (toInterfacePtr<T, AttrUpdateDuringPause>(system.get())) {
+            attributes |= UpdateDuringPause;
+        }
         mAttributes.push_back(attributes);
 
         T* rawPtr = system.get();
         mSystems.push_back(std::move(system));
         return rawPtr;
+    }
+
+    // register systems which don't implement FixedUpdate
+    template <class... T>
+        requires(!std::derived_from<T, IFixedUpdate>, ...)
+    SystemManager& registerSystems(u16 attributes = 0) {
+        (registerSystem<T>(attributes), ...);
+
+        return *this;
+    }
+
+    // registers systems which must run sequentially
+    template <class... T>
+    SystemManager& sequential() {
+        int groupStartIx = mSystems.size();
+        (registerSystem<T>(), ...);
+        std::vector<int> groupIndices;
+        for (size_t i = groupStartIx; i < mSystems.size(); i++) {
+            if (mUpdateSystems[i]) {
+                groupIndices.push_back(i);
+            }
+        }
+        mUpdateGroups.push_back({false, std::move(groupIndices)});
+
+        return *this;
+    }
+
+    // registers systems which can run in parallel
+    template <class... T>
+    SystemManager& parallel() {
+        int groupStartIx = mSystems.size();
+        (registerSystem<T>(), ...);
+        std::vector<int> groupIndices;
+        for (size_t i = groupStartIx; i < mSystems.size(); i++) {
+            if (mUpdateSystems[i]) {
+                groupIndices.push_back(i);
+            }
+        }
+        mUpdateGroups.push_back({true, std::move(groupIndices)});
+
+        return *this;
+    }
+
+    void autoUpdate() {
+        for (auto& [isParallel, group] : mUpdateGroups) {
+            // eventually if isParallel then do in parallel RESEARCH
+            for (auto ix : group) {
+                if (mIsWorldPaused && (mAttributes[ix] & UpdateDuringPause) == 0) {
+                } else {
+                    mUpdateSystems[ix]->fixedUpdate();
+                }
+            }
+        }
     }
 
     void onEntityDestroyed(const Entity entity) const {
@@ -464,7 +532,7 @@ public:
 
     void onEntityPatternChanged(const Entity entity, const Pattern newEntityPattern) const {
         // TODO make thread safe
-        for (size_t i = 0; i < mSystemIDs.size(); i++) {
+        for (size_t i = 0; i < mSystems.size(); i++) {
             auto const& systemPattern = mPatterns[i];
             auto const ix = mSystems[i]->getEntitiesVirtual().find(entity.id());
             if ((newEntityPattern & systemPattern) == systemPattern) {
@@ -518,12 +586,16 @@ private:
         return id;
     }
 
-    std::vector<SystemId> mSystemIDs;
+    std::unordered_map<SystemId, int> mSystemIdToIndex;
     std::vector<Pattern> mPatterns;
     std::vector<Corrade::Containers::Pointer<SystemBase>> mSystems;
+    std::vector<IFixedUpdate*> mUpdateSystems;
     std::vector<IMonitorSystem*> mMonitorSystems;
-    std::vector<IPausableSystem*> mPauseSystems;
+    std::vector<IReactToPause*> mPauseSystems;
     std::vector<u16> mAttributes;
+
+    std::vector<std::pair<bool, std::vector<int>>>
+        mUpdateGroups;  // ordered list of lists, where each list is 1+ systems which need to be updated sequentially
     bool mIsWorldPaused = false;
 };
 
@@ -597,9 +669,19 @@ public:
 
     // SYSTEM
     template <typename T>
+    T* getSystem() const {
+        return mSystemManager->getSystem<T>();
+    }
+
+    template <typename T>
     T* registerSystem(u16 attributes = 0) const {
         return mSystemManager->registerSystem<T>(attributes);
     }
+
+    // this doesn't do anything, but I want the caller code to be understandable
+    SystemManager& BeginSystemRegistration() const { return *mSystemManager.get(); }
+
+    void update() const { mSystemManager->autoUpdate(); }
 
     void pause() const { mSystemManager->onPaused(); }
 
