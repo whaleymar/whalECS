@@ -222,6 +222,7 @@ public:
     template <typename T>
     void registerComponent() {
         const ComponentType type = getComponentID<T>();
+        assert(type < MAX_COMPONENTS && "Registered more than MAX_COMPONENTS components");
         assert(whal_find(mComponentTypes.begin(), mComponentTypes.end(), type) == mComponentTypes.end() && "Component type already registered");
         mComponentTypes.push_back(type);
         mComponentArrays.push_back(Corrade::Containers::pointer<ComponentArray<T>>());
@@ -233,7 +234,6 @@ public:
         auto it = whal_find(mComponentTypes.begin(), mComponentTypes.end(), type);
         if (it == mComponentTypes.end()) {
             return Corrade::Containers::NullOpt;
-            // return std::nullopt;
         }
         return type;
     }
