@@ -6,6 +6,7 @@
 #include <concepts>
 #include <mutex>
 #include <queue>
+#include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -352,6 +353,9 @@ public:
     virtual void fixedUpdate() = 0;
 };
 
+template <typename T>
+struct NotFixedUpdate : std::bool_constant<!std::is_base_of_v<IFixedUpdate, T>> {};
+
 // could also do onActivated?
 class IMonitorSystem {
 public:
@@ -465,7 +469,8 @@ public:
 
     // register systems which don't implement FixedUpdate
     template <class... T>
-        requires(!std::derived_from<T, IFixedUpdate>, ...)
+    // requires(std::conjunction_v<!std::derived_from<T, IFixedUpdate>>, ...)
+        requires(std::conjunction_v<NotFixedUpdate<T>...>)
     SystemManager& registerSystems(u16 attributes = 0) {
         (registerSystem<T>(attributes), ...);
 
