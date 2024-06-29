@@ -12,6 +12,7 @@ Expected<Entity> World::entity(bool isAlive) const {
     return mEntityManager->createEntity(isAlive);
 }
 
+// works for inactive entities too, trust me
 void World::kill(Entity entity) {
     mToKill.insert(entity);
 }
