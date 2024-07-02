@@ -614,7 +614,6 @@ public:
     // ENTITY
     Expected<Entity> entity(bool isAlive = true) const;
     void kill(Entity entity);
-    void killEntities();
 
     Expected<Entity> copy(Entity entity) const;
     void activate(Entity entity) const;
@@ -689,7 +688,10 @@ public:
     // this doesn't do anything, but I want the caller code to be understandable
     SystemManager& BeginSystemRegistration() const { return *mSystemManager.get(); }
 
-    void update() const { mSystemManager->autoUpdate(); }
+    void update() {
+        mSystemManager->autoUpdate();
+        killEntities();
+    }
 
     void pause() const { mSystemManager->onPaused(); }
 
@@ -703,6 +705,8 @@ private:
 
     // is private because it's a bad idea to use this in game logic. An entity's ID could be recycled at any time
     bool isActive(Entity entity) const;
+
+    void killEntities();  // called by update
 
     Corrade::Containers::Pointer<EntityManager> mEntityManager;
     Corrade::Containers::Pointer<ComponentManager> mComponentManager;
