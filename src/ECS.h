@@ -348,13 +348,13 @@ public:
 //     virtual void onEnd() = 0;
 // };
 
-class IFixedUpdate {
+class IUpdate {
 public:
-    virtual void fixedUpdate() = 0;
+    virtual void update() = 0;
 };
 
 template <typename T>
-struct NotFixedUpdate : std::bool_constant<!std::is_base_of_v<IFixedUpdate, T>> {};
+struct NotFixedUpdate : std::bool_constant<!std::is_base_of_v<IUpdate, T>> {};
 
 // could also do onActivated?
 class IMonitorSystem {
@@ -424,6 +424,11 @@ I* toInterfacePtr(T* ptr) {
 }
 
 class SystemManager {
+    struct UpdateGroupInfo {
+        int intervalFrame;
+        bool isParallel;
+    };
+
 public:
     enum Attributes : u16 {
         UniqueEntity = 1,
@@ -449,7 +454,7 @@ public:
         Corrade::Containers::Pointer<T> system = Corrade::Containers::pointer<T>();
         mPatterns.push_back(system->getPattern());
 
-        mUpdateSystems.push_back(toInterfacePtr<T, IFixedUpdate>(system.get()));
+        mUpdateSystems.push_back(toInterfacePtr<T, IUpdate>(system.get()));
         mMonitorSystems.push_back(toInterfacePtr<T, IMonitorSystem>(system.get()));
         mPauseSystems.push_back(toInterfacePtr<T, IReactToPause>(system.get()));
 
@@ -479,7 +484,7 @@ public:
 
     // registers systems which must run sequentially
     template <class... T>
-    SystemManager& sequential() {
+    SystemManager& sequential(int interval = 1) {
         int groupStartIx = mSystems.size();
         (registerSystem<T>(), ...);
         std::vector<int> groupIndices;
@@ -488,14 +493,14 @@ public:
                 groupIndices.push_back(i);
             }
         }
-        mUpdateGroups.push_back({false, std::move(groupIndices)});
+        mUpdateGroups.push_back({UpdateGroupInfo(interval, false), std::move(groupIndices)});
 
         return *this;
     }
 
     // registers systems which can run in parallel
     template <class... T>
-    SystemManager& parallel() {
+    SystemManager& parallel(int interval = 1) {
         int groupStartIx = mSystems.size();
         (registerSystem<T>(), ...);
         std::vector<int> groupIndices;
@@ -504,21 +509,26 @@ public:
                 groupIndices.push_back(i);
             }
         }
-        mUpdateGroups.push_back({true, std::move(groupIndices)});
+        bool isParallel = groupIndices.size() > 1;
+        mUpdateGroups.push_back({UpdateGroupInfo(interval, isParallel), std::move(groupIndices)});
 
         return *this;
     }
 
     void autoUpdate() {
-        for (auto& [isParallel, group] : mUpdateGroups) {
+        for (auto& [groupInfo, group] : mUpdateGroups) {
             // eventually if isParallel then do in parallel RESEARCH
+            if (mFrame % groupInfo.intervalFrame != 0) {
+                continue;
+            }
             for (auto ix : group) {
                 if (mIsWorldPaused && (mAttributes[ix] & UpdateDuringPause) == 0) {
                 } else {
-                    mUpdateSystems[ix]->fixedUpdate();
+                    mUpdateSystems[ix]->update();
                 }
             }
         }
+        mFrame++;
     }
 
     void onEntityDestroyed(const Entity entity) const {
@@ -594,13 +604,14 @@ private:
     std::unordered_map<SystemId, int> mSystemIdToIndex;
     std::vector<Pattern> mPatterns;
     std::vector<Corrade::Containers::Pointer<SystemBase>> mSystems;
-    std::vector<IFixedUpdate*> mUpdateSystems;
+    std::vector<IUpdate*> mUpdateSystems;
     std::vector<IMonitorSystem*> mMonitorSystems;
     std::vector<IReactToPause*> mPauseSystems;
     std::vector<u16> mAttributes;
 
-    std::vector<std::pair<bool, std::vector<int>>>
+    std::vector<std::pair<UpdateGroupInfo, std::vector<int>>>
         mUpdateGroups;  // ordered list of lists, where each list is 1+ systems which need to be updated sequentially
+    int mFrame = 0;
     bool mIsWorldPaused = false;
 };
 
