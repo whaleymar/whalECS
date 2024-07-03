@@ -21,7 +21,3 @@ The main changes are:
 
 - onModify virtual method for IMonitor systems: safer way to call entity.set(), because it currently circumvents the onRemove pattern I have, causing memory leaks for things with VAOs/VBOs/other manually deallocated stuff
 - thread-safe system methods
-
-### Nice to have
-
-- max entities/max components values should be macros which are optionally defined before the first time ECS.h is included, similar to rapidXML

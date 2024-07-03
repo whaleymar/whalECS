@@ -20,19 +20,22 @@
 typedef uint16_t u16;
 typedef uint32_t u32;
 
+#ifndef MAX_ENTITIES
+#define MAX_ENTITIES 5000
+#endif
+
+#ifndef MAX_COMPONENTS
+#define MAX_COMPONENTS 64
+#endif
+
 namespace whal::ecs {
 
 class EntityManager;
 class SystemManager;
 
 using EntityID = u32;
-constexpr u32 MAX_ENTITIES = 5000;
-
 using ComponentType = u16;
-constexpr ComponentType MAX_COMPONENTS = 64;
-
 using Pattern = std::bitset<MAX_COMPONENTS>;
-
 using SystemId = u16;
 
 class Entity;
