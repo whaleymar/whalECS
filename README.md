@@ -19,5 +19,5 @@ The main changes are:
 
 ### Need:
 
-- onModify virtual method for IMonitor systems: safer way to call entity.set(), because it currently circumvents the onRemove pattern I have, causing memory leaks for things with VAOs/VBOs/other manually deallocated stuff
 - thread-safe system methods
+- parallelization

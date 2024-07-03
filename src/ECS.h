@@ -359,11 +359,12 @@ public:
 template <typename T>
 struct NotFixedUpdate : std::bool_constant<!std::is_base_of_v<IUpdate, T>> {};
 
-// could also do onActivated?
+// called when an entity is added/removed from a system. All components in that system can be accessed for that entity when these methods run.
+// An entity is not added to any systems until it's activated (FYI).
+// NOTE: neither method is run when a component is modified using entity.set<T>().
 class IMonitorSystem {
 public:
     virtual void onAdd(const Entity entity) = 0;
-    // virtual void onModify(const Entity entity) = 0; // TODO
     virtual void onRemove(const Entity entity) = 0;
 };
 
