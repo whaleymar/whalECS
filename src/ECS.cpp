@@ -30,6 +30,11 @@ void World::killEntities() {
         mEntityManager->destroyEntity(entity);
         mComponentManager->entityDestroyed(entity);
     }
+
+    // remove any redundant kills
+    for (auto entity : tmpToKill) {
+        mToKill.erase(entity);
+    }
 }
 
 Expected<Entity> World::copy(Entity prefab) const {

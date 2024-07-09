@@ -629,6 +629,7 @@ public:
     // ENTITY
     Expected<Entity> entity(bool isAlive = true) const;
     void kill(Entity entity);
+    void killEntities();  // called by update. Should only be called manually in specific circumstances like scene loading
 
     Expected<Entity> copy(Entity entity) const;
     void activate(Entity entity) const;
@@ -720,8 +721,6 @@ private:
 
     // is private because it's a bad idea to use this in game logic. An entity's ID could be recycled at any time
     bool isActive(Entity entity) const;
-
-    void killEntities();  // called by update
 
     Corrade::Containers::Pointer<EntityManager> mEntityManager;
     Corrade::Containers::Pointer<ComponentManager> mComponentManager;
