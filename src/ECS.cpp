@@ -18,22 +18,24 @@ void World::kill(Entity entity) {
 }
 
 void World::killEntities() {
-    // copy mToKill in case onRemove callbacks kill more entities
-    auto tmpToKill = std::move(mToKill);
-    mToKill.clear();
-    for (auto entity : tmpToKill) {
-        if (mDeathCallback != nullptr) {
-            mDeathCallback(entity);
+    while (!mToKill.empty()) {
+        // copy mToKill in case onRemove callbacks kill more entities
+        auto tmpToKill = std::move(mToKill);
+        mToKill.clear();
+        for (auto entity : tmpToKill) {
+            if (mDeathCallback != nullptr) {
+                mDeathCallback(entity);
+            }
+            mSystemManager->onEntityDestroyed(entity);  // this goes first so onRemove can fetch components before
+                                                        // they're deallocated
+            mEntityManager->destroyEntity(entity);
+            mComponentManager->entityDestroyed(entity);
         }
-        mSystemManager->onEntityDestroyed(entity);  // this goes first so onRemove can fetch components before
-                                                    // they're deallocated
-        mEntityManager->destroyEntity(entity);
-        mComponentManager->entityDestroyed(entity);
-    }
 
-    // remove any redundant kills
-    for (auto entity : tmpToKill) {
-        mToKill.erase(entity);
+        // remove any redundant kills
+        for (auto entity : tmpToKill) {
+            mToKill.erase(entity);
+        }
     }
 }
 
