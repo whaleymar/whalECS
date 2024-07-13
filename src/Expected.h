@@ -1,12 +1,12 @@
 #pragma once
 
-#include <string>
 #include <iostream>
+#include <string>
 
 class Error {
 public:
     Error() = default;
-    Error(std::string trace) : mTrace(trace){};
+    Error(const std::string& trace) : mTrace(trace){};
 
     friend std::ostream& operator<<(std::ostream& outs, const Error& e) { return outs << e.mTrace; }
 
@@ -20,7 +20,7 @@ public:
     Expected(T value) : mExpected(value), mIsExpected(true){};
     Expected(Error error) : mExpected(T()), mError(error), mIsExpected(false){};
 
-    static Expected<T> error(std::string trace) { return Expected(Error(trace)); }
+    static Expected<T> error(const std::string& trace) { return Expected(Error(trace)); }
 
     const T& operator*() const { return mExpected; }
 

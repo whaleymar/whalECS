@@ -1,0 +1,16 @@
+Checking src/ComponentManager.cpp ...
+src/ECS.h:124:1: style: The class 'ComponentArray' does not declare a constructor although it has private member variables which likely require initialization. [noConstructor]
+class ComponentArray : public IComponentArray {
+^
+src/ECS.h:399:49: performance: Function 'getEntitiesCopy()' should return member 'mEntities' by const reference. [returnByReference]
+    static std::unordered_map<EntityID, Entity> getEntitiesCopy() { return mEntities; }
+                                                ^
+1/4 files checked 9% done
+Checking src/ECS.cpp ...
+2/4 files checked 57% done
+Checking src/Entity.cpp ...
+3/4 files checked 67% done
+Checking src/EntityManager.cpp ...
+4/4 files checked 100% done
+nofile:0:0: information: Active checkers: 166/802 (use --checkers-report=<filename> to see details) [checkersReport]
+

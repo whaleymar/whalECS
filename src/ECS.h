@@ -123,6 +123,7 @@ public:
 template <typename T>
 class ComponentArray : public IComponentArray {
 public:
+    ComponentArray() = default;
     // TODO
     // static_assert(std::is_trivial_v<T>, "Component is not trivial type (see
     // https://en.cppreference.com/w/cpp/language/classes#Trivial_class)");
@@ -206,7 +207,7 @@ public:
 
     Expected<Entity> createEntity(bool isAlive);
     void destroyEntity(Entity entity);
-    void setPattern(Entity entity, Pattern pattern);
+    void setPattern(Entity entity, const Pattern& pattern);
     Pattern getPattern(Entity entity) const;
     u32 getEntityCount() const { return mEntityCount; }
     bool isActive(Entity entity) const;
@@ -225,6 +226,8 @@ private:
 
 class ComponentManager {
 public:
+    ComponentManager() = default;
+
     template <typename T>
     void registerComponent() {
         const ComponentType type = getComponentID<T>();
@@ -393,7 +396,7 @@ public:
     }
 
     std::unordered_map<EntityID, Entity>& getEntitiesVirtual() override { return mEntities; }
-    static std::unordered_map<EntityID, Entity>& getEntitiesRef() { return mEntities; }
+    static std::unordered_map<EntityID, Entity>& getEntitiesMutable() { return mEntities; }
     static std::unordered_map<EntityID, Entity> getEntitiesCopy() { return mEntities; }
     static Entity first() { return mEntities.begin()->second; }
     Pattern getPattern() { return mPattern; }
@@ -425,7 +428,7 @@ I* toInterfacePtr(T* ptr) {
 
 template <typename T, typename I>
     requires(!std::derived_from<T, I>)
-I* toInterfacePtr(T* ptr) {
+I* toInterfacePtr(const T* const ptr) {
     return nullptr;
 }
 
@@ -551,7 +554,7 @@ public:
         }
     }
 
-    void onEntityPatternChanged(const Entity entity, const Pattern newEntityPattern) const {
+    void onEntityPatternChanged(const Entity entity, const Pattern& newEntityPattern) const {
         // TODO make thread safe
         for (size_t i = 0; i < mSystems.size(); i++) {
             auto const& systemPattern = mPatterns[i];

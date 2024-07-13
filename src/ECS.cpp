@@ -2,11 +2,9 @@
 
 namespace whal::ecs {
 
-World::World() {
-    mComponentManager = Corrade::Containers::pointer<ComponentManager>();
-    mEntityManager = Corrade::Containers::pointer<EntityManager>();
-    mSystemManager = Corrade::Containers::pointer<SystemManager>();
-}
+World::World()
+    : mEntityManager(Corrade::Containers::pointer<EntityManager>()), mComponentManager(Corrade::Containers::pointer<ComponentManager>()),
+      mSystemManager(Corrade::Containers::pointer<SystemManager>()) {}
 
 Expected<Entity> World::entity(bool isAlive) const {
     return mEntityManager->createEntity(isAlive);
@@ -22,19 +20,19 @@ void World::killEntities() {
         // copy mToKill in case onRemove callbacks kill more entities
         auto tmpToKill = std::move(mToKill);
         mToKill.clear();
-        for (auto entity : tmpToKill) {
+        for (auto entityToKill : tmpToKill) {
             if (mDeathCallback != nullptr) {
-                mDeathCallback(entity);
+                mDeathCallback(entityToKill);
             }
-            mSystemManager->onEntityDestroyed(entity);  // this goes first so onRemove can fetch components before
-                                                        // they're deallocated
-            mEntityManager->destroyEntity(entity);
-            mComponentManager->entityDestroyed(entity);
+            mSystemManager->onEntityDestroyed(entityToKill);  // this goes first so onRemove can fetch components before
+                                                              // they're deallocated
+            mEntityManager->destroyEntity(entityToKill);
+            mComponentManager->entityDestroyed(entityToKill);
         }
 
         // remove any redundant kills
-        for (auto entity : tmpToKill) {
-            mToKill.erase(entity);
+        for (auto entityToKill : tmpToKill) {
+            mToKill.erase(entityToKill);
         }
     }
 }

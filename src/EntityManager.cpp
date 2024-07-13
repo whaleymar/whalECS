@@ -31,7 +31,7 @@ void EntityManager::destroyEntity(Entity entity) {
     mEntityCount--;
 }
 
-void EntityManager::setPattern(Entity entity, Pattern pattern) {
+void EntityManager::setPattern(Entity entity, const Pattern& pattern) {
     mPatterns[entity.mId] = pattern;
 }
 
