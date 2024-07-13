@@ -17,4 +17,8 @@ void Entity::activate() const {
     World::getInstance().activate(*this);
 }
 
+void Entity::deactivate() const {
+    World::getInstance().deactivate(*this);
+}
+
 }  // namespace whal::ecs

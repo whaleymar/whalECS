@@ -79,6 +79,7 @@ public:
     Expected<Entity> copy() const;
 
     void activate() const;
+    void deactivate() const;
     void kill() const;
 
 private:
@@ -212,6 +213,7 @@ public:
 
     // returns true if entity was activated, false if it was already active
     bool activate(Entity entity);
+    bool deactivate(Entity entity);
 
 private:
     std::queue<EntityID> mAvailableIDs;
@@ -633,6 +635,7 @@ public:
 
     Expected<Entity> copy(Entity entity) const;
     void activate(Entity entity) const;
+    void deactivate(Entity entity) const;
 
     u32 getEntityCount() const;
     void setEntityDeathCallback(EntityDeathCallback callback);

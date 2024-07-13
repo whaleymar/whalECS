@@ -51,4 +51,12 @@ bool EntityManager::activate(Entity entity) {
     return true;
 }
 
+bool EntityManager::deactivate(Entity entity) {
+    if (!isActive(entity)) {
+        return false;
+    }
+    mActiveEntities.reset(static_cast<u32>(entity.id()));
+    return true;
+}
+
 }  // namespace whal::ecs

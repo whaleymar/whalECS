@@ -21,3 +21,4 @@ The main changes are:
 
 - thread-safe system methods
 - parallelization
+- queue add/remove operations until end of frame? so i'm only iterating through the system stuff once. also avoids accidental mutation during update loops

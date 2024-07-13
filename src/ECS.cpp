@@ -58,6 +58,13 @@ void World::activate(Entity entity) const {
     }
 }
 
+void World::deactivate(Entity entity) const {
+    // remove from systems but keep in entity manager and component manager
+    if (mEntityManager->deactivate(entity)) {
+        mSystemManager->onEntityDestroyed(entity);
+    }
+}
+
 u32 World::getEntityCount() const {
     return mEntityManager->getEntityCount();
 }
