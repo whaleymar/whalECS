@@ -5,8 +5,8 @@ namespace whal::ecs {
 
 Entity::Entity(EntityID id) : mId(id){};
 
-Expected<Entity> Entity::copy() const {
-    return World::getInstance().copy(*this);
+Expected<Entity> Entity::copy(bool isActive) const {
+    return World::getInstance().copy(*this, isActive);
 }
 
 void Entity::kill() const {

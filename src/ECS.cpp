@@ -37,14 +37,17 @@ void World::killEntities() {
     }
 }
 
-Expected<Entity> World::copy(Entity prefab) const {
+Expected<Entity> World::copy(Entity prefab, bool isActive) const {
     Expected<Entity> newEntity = entity(false);
     if (!newEntity.isExpected()) {
         return newEntity;
     }
     mComponentManager->copyComponents(prefab, newEntity.value());
+    mEntityManager->setPattern(newEntity.value(), mEntityManager->getPattern(prefab));
 
-    newEntity.value().activate();
+    if (isActive) {
+        newEntity.value().activate();
+    }
 
     return newEntity;
 }

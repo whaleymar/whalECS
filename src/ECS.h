@@ -76,7 +76,7 @@ public:
     template <typename T>
     bool has() const;
 
-    Expected<Entity> copy() const;
+    Expected<Entity> copy(bool isActive = true) const;
 
     void activate() const;
     void deactivate() const;
@@ -636,7 +636,7 @@ public:
     void kill(Entity entity);
     void killEntities();  // called by update. Should only be called manually in specific circumstances like scene loading
 
-    Expected<Entity> copy(Entity entity) const;
+    Expected<Entity> copy(Entity entity, bool isActive) const;
     void activate(Entity entity) const;
     void deactivate(Entity entity) const;
 
