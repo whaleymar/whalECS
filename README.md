@@ -22,3 +22,10 @@ The main changes are:
 - thread-safe system methods
 - parallelization
 - queue add/remove operations until end of frame? so i'm only iterating through the system stuff once. also avoids accidental mutation during update loops
+    - con: cannot immediately access components added that frame
+- store components in std::vector for "unlimited" growth? Would also prevent allocating MAXENTITIES # of structs for low-use components
+    - would require changes to:
+        - ComponentArray.add: push_back
+        - ComponentArray.remove: pop_back
+        - EntityManager::mPatterns: would be a vector & would need slightly more management (id->ix map or something)
+        - EntityManager::mActiveEntities: is a bitset, would need to convert to a std::vector<bool>
