@@ -68,7 +68,7 @@ public:
     void remove();
 
     template <typename T>
-    Corrade::Containers::Optional<T*> tryGet() const;
+    Corrade::Containers::Optional<T> tryGet() const;
 
     template <typename T>
     T& get() const;
@@ -166,12 +166,12 @@ public:
 
     bool hasData(const Entity entity) const { return mEntityToIndex.find(entity.id()) != mEntityToIndex.end(); }
 
-    Corrade::Containers::Optional<T*> tryGetData(const Entity entity) {
+    Corrade::Containers::Optional<T> tryGetData(const Entity entity) {
         if (mEntityToIndex.find(entity.id()) == mEntityToIndex.end()) {
             return Corrade::Containers::NullOpt;
         }
         const u32 ix = mEntityToIndex.at(entity.id());
-        return &mComponentTable.at(ix);
+        return mComponentTable.at(ix);
     }
 
     T& getData(const Entity entity) {
@@ -189,7 +189,7 @@ public:
     void copyComponent(const Entity prefab, Entity dest) override {
         auto cmpOpt = tryGetData(prefab);
         if (cmpOpt) {
-            addData(dest, **cmpOpt);
+            addData(dest, *cmpOpt);
         }
     }
 
@@ -297,7 +297,7 @@ public:
     }
 
     template <typename T>
-    Corrade::Containers::Optional<T*> tryGetComponent(const Entity entity) const {
+    Corrade::Containers::Optional<T> tryGetComponent(const Entity entity) const {
         const ComponentType type = getComponentID<T>();
         auto it = whal_find(mComponentTypes.begin(), mComponentTypes.end(), type);
         if (it == mComponentTypes.end()) {
@@ -682,7 +682,7 @@ public:
     }
 
     template <typename T>
-    Corrade::Containers::Optional<T*> tryGetComponent(const Entity entity) const {
+    Corrade::Containers::Optional<T> tryGetComponent(const Entity entity) const {
         return mComponentManager->tryGetComponent<T>(entity);
     }
 
@@ -756,7 +756,7 @@ void Entity::remove() {
 }
 
 template <typename T>
-Corrade::Containers::Optional<T*> Entity::tryGet() const {
+Corrade::Containers::Optional<T> Entity::tryGet() const {
     return World::getInstance().tryGetComponent<T>(*this);
 }
 
