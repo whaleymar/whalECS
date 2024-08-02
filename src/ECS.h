@@ -224,6 +224,9 @@ private:
     u32 mEntityCount = 0;
 };
 
+template <typename T>
+class Lacks;
+
 class ComponentManager {
 public:
     ComponentManager() = default;
@@ -322,9 +325,16 @@ public:
     // assign unique IDs to each component type
     static inline ComponentType ComponentID = 0;
     template <typename T>
+        requires(!is_base_of_template<Lacks, T>::value)
     static inline ComponentType getComponentID() {
         static ComponentType id = ComponentID++;
         return id;
+    }
+
+    template <typename T>
+        requires(is_base_of_template<Lacks, T>::value)
+    static inline ComponentType getComponentID() {
+        return T::COMPONENT_TYPE;
     }
 
 private:
@@ -337,12 +347,20 @@ private:
     std::vector<Corrade::Containers::Pointer<IComponentArray>> mComponentArrays;
 };
 
+// wrapper type which tells a system that the entity should *not* have this component
+template <typename T>
+class Lacks {
+public:
+    inline static ComponentType COMPONENT_TYPE = ComponentManager::getComponentID<T>();
+};
+
 class SystemBase {
 public:
     friend SystemManager;
     virtual ~SystemBase() = default;
 
     virtual std::unordered_map<EntityID, Entity>& getEntitiesVirtual() = 0;  // only used by SystemManager
+    virtual bool isPatternInSystem(Pattern pattern) = 0;
 };
 
 // might combine these two? not sure who would use it
@@ -389,9 +407,13 @@ class ISystem : public SystemBase {
 public:
     ISystem() {
         std::vector<ComponentType> componentTypes;
-        InitializeIDs<T...>(componentTypes);
+        std::vector<ComponentType> antiComponentTypes;
+        InitializeIDs<T...>(componentTypes, antiComponentTypes);
         for (auto const& componentType : componentTypes) {
             mPattern.set(componentType);
+        }
+        for (auto const& componentType : antiComponentTypes) {
+            mAntiPattern.set(componentType);
         }
     }
 
@@ -400,23 +422,33 @@ public:
     static std::unordered_map<EntityID, Entity> getEntitiesCopy() { return mEntities; }
     static Entity first() { return mEntities.begin()->second; }
     Pattern getPattern() { return mPattern; }
+    bool isPatternInSystem(Pattern pattern) override { return (pattern & mPattern) == mPattern && (pattern & mAntiPattern) == 0; }
 
 private:
     // need a First and Second, otherwise there is ambiguity when there's only one
     // element (InitializeIDs<type> vs InitializeIDs<type, <>>)
     template <typename First, typename Second, typename... Rest>
-    static void InitializeIDs(std::vector<ComponentType>& componentTypes) {
-        componentTypes.push_back(ComponentManager::getComponentID<First>());
-        InitializeIDs<Second, Rest...>(componentTypes);
+    static void InitializeIDs(std::vector<ComponentType>& componentTypes, std::vector<ComponentType>& antiComponentTypes) {
+        if (is_base_of_template<Lacks, First>::value) {
+            antiComponentTypes.push_back(ComponentManager::getComponentID<First>());
+        } else {
+            componentTypes.push_back(ComponentManager::getComponentID<First>());
+        }
+        InitializeIDs<Second, Rest...>(componentTypes, antiComponentTypes);
     }
 
     template <typename Last>
-    static void InitializeIDs(std::vector<ComponentType>& componentTypes) {
-        componentTypes.push_back(ComponentManager::getComponentID<Last>());
+    static void InitializeIDs(std::vector<ComponentType>& componentTypes, std::vector<ComponentType>& antiComponentTypes) {
+        if (is_base_of_template<Lacks, Last>::value) {
+            antiComponentTypes.push_back(ComponentManager::getComponentID<Last>());
+        } else {
+            componentTypes.push_back(ComponentManager::getComponentID<Last>());
+        }
     }
 
     inline static std::unordered_map<EntityID, Entity> mEntities = {};
     Pattern mPattern;
+    Pattern mAntiPattern;
 };
 
 // i fucking love concepts
@@ -461,7 +493,6 @@ public:
         mSystemIdToIndex.insert({id, mSystems.size()});
 
         Corrade::Containers::Pointer<T> system = Corrade::Containers::pointer<T>();
-        mPatterns.push_back(system->getPattern());
 
         mUpdateSystems.push_back(toInterfacePtr<T, IUpdate>(system.get()));
         mMonitorSystems.push_back(toInterfacePtr<T, IMonitorSystem>(system.get()));
@@ -557,9 +588,8 @@ public:
     void onEntityPatternChanged(const Entity entity, const Pattern& newEntityPattern) const {
         // TODO make thread safe
         for (size_t i = 0; i < mSystems.size(); i++) {
-            auto const& systemPattern = mPatterns[i];
             auto const ix = mSystems[i]->getEntitiesVirtual().find(entity.id());
-            if ((newEntityPattern & systemPattern) == systemPattern) {
+            if (mSystems[i]->isPatternInSystem(newEntityPattern)) {
                 if (ix != mSystems[i]->getEntitiesVirtual().end()) {
                     // already in system
                     continue;
@@ -611,7 +641,6 @@ private:
     }
 
     std::unordered_map<SystemId, int> mSystemIdToIndex;
-    std::vector<Pattern> mPatterns;
     std::vector<Corrade::Containers::Pointer<SystemBase>> mSystems;
     std::vector<IUpdate*> mUpdateSystems;
     std::vector<IMonitorSystem*> mMonitorSystems;
