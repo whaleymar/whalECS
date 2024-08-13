@@ -28,7 +28,9 @@ typedef uint32_t u32;
 #define MAX_COMPONENTS 64
 #endif
 
-#define DECLARE_COMPONENT_GETTER(Type) template Type& whal::ecs::Entity::get<Type>() const;
+#define DECLARE_COMPONENT_GETTER(Type)                                                                                                               \
+    template Type& whal::ecs::Entity::get<Type>() const;                                                                                             \
+    template bool whal::ecs::Entity::has<Type>() const;
 
 namespace whal::ecs {
 
@@ -57,17 +59,17 @@ public:
     bool operator<(Entity other) const { return mId < other.mId; }
 
     template <typename T>
-    void add(T component);
+    Entity add(T component);
 
     template <typename T>
-    void add();
+    Entity add();
 
     // set value of component that's been added
     template <typename T>
-    void set(T component) const;
+    Entity set(T component) const;
 
     template <typename T>
-    void remove();
+    Entity remove();
 
     template <typename T>
     Corrade::Containers::Optional<T> tryGet() const;
@@ -227,7 +229,7 @@ private:
 };
 
 template <typename T>
-class Lacks;
+class Exclude;
 
 class ComponentManager {
 public:
@@ -327,14 +329,14 @@ public:
     // assign unique IDs to each component type
     static inline ComponentType ComponentID = 0;
     template <typename T>
-        requires(!is_base_of_template<Lacks, T>::value)
+        requires(!is_base_of_template<Exclude, T>::value)
     static inline ComponentType getComponentID() {
         static ComponentType id = ComponentID++;
         return id;
     }
 
     template <typename T>
-        requires(is_base_of_template<Lacks, T>::value)
+        requires(is_base_of_template<Exclude, T>::value)
     static inline ComponentType getComponentID() {
         return T::COMPONENT_TYPE;
     }
@@ -351,7 +353,7 @@ private:
 
 // wrapper type which tells a system that the entity should *not* have this component
 template <typename T>
-class Lacks {
+class Exclude {
 public:
     inline static ComponentType COMPONENT_TYPE = ComponentManager::getComponentID<T>();
 };
@@ -431,7 +433,7 @@ private:
     // element (InitializeIDs<type> vs InitializeIDs<type, <>>)
     template <typename First, typename Second, typename... Rest>
     static void InitializeIDs(std::vector<ComponentType>& componentTypes, std::vector<ComponentType>& antiComponentTypes) {
-        if (is_base_of_template<Lacks, First>::value) {
+        if (is_base_of_template<Exclude, First>::value) {
             antiComponentTypes.push_back(ComponentManager::getComponentID<First>());
         } else {
             componentTypes.push_back(ComponentManager::getComponentID<First>());
@@ -441,7 +443,7 @@ private:
 
     template <typename Last>
     static void InitializeIDs(std::vector<ComponentType>& componentTypes, std::vector<ComponentType>& antiComponentTypes) {
-        if (is_base_of_template<Lacks, Last>::value) {
+        if (is_base_of_template<Exclude, Last>::value) {
             antiComponentTypes.push_back(ComponentManager::getComponentID<Last>());
         } else {
             componentTypes.push_back(ComponentManager::getComponentID<Last>());
@@ -767,23 +769,27 @@ private:
 };
 
 template <typename T>
-void Entity::add(T component) {
+Entity Entity::add(T component) {
     World::getInstance().addComponent<T>(*this, component);
+    return *this;
 }
 
 template <typename T>
-void Entity::add() {
+Entity Entity::add() {
     World::getInstance().addComponent<T>(*this, T());
+    return *this;
 }
 
 template <typename T>
-void Entity::set(T component) const {
+Entity Entity::set(T component) const {
     World::getInstance().setComponent<T>(*this, component);
+    return *this;
 }
 
 template <typename T>
-void Entity::remove() {
+Entity Entity::remove() {
     World::getInstance().removeComponent<T>(*this);
+    return *this;
 }
 
 template <typename T>
