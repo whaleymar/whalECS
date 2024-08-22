@@ -28,10 +28,6 @@ typedef uint32_t u32;
 #define MAX_COMPONENTS 64
 #endif
 
-#define DECLARE_COMPONENT_GETTER(Type)                                                                                                               \
-    template Type& whal::ecs::Entity::get<Type>() const;                                                                                             \
-    template bool whal::ecs::Entity::has<Type>() const;
-
 namespace whal::ecs {
 
 class EntityManager;
