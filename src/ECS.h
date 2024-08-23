@@ -123,12 +123,15 @@ public:
 template <typename T>
 class ComponentArray : public IComponentArray {
 public:
-    ComponentArray() = default;
+    ComponentArray() {
+        mEntityToIndex.fill(-1);
+        mIndexToEntity.fill(0);
+    }
     // TODO
     // static_assert(std::is_trivial_v<T>, "Component is not trivial type (see
     // https://en.cppreference.com/w/cpp/language/classes#Trivial_class)");
     void addData(const Entity entity, T component) {
-        if (mEntityToIndex.find(entity.id()) != mEntityToIndex.end()) {
+        if (hasData(entity)) {
             const u32 ix = mEntityToIndex[entity.id()];
             mComponentTable[ix] = component;
             return;
@@ -140,12 +143,12 @@ public:
     }
 
     void setData(const Entity entity, T component) {
-        assert(mEntityToIndex.find(entity.id()) != mEntityToIndex.end() && "cannot set component value without adding it to the entity first");
+        assert(mEntityToIndex[entity.id()] != -1 && "cannot set component value without adding it to the entity first");
         mComponentTable[mEntityToIndex[entity.id()]] = component;
     }
 
     void removeData(const Entity entity) {
-        if (mEntityToIndex.find(entity.id()) == mEntityToIndex.end()) {
+        if (!hasData(entity)) {
             return;
         }
 
@@ -160,14 +163,14 @@ public:
             mIndexToEntity[removeIx] = lastEntity.id();
         }
 
-        mEntityToIndex.erase(entity.id());
-        mIndexToEntity.erase(lastIx);
+        mEntityToIndex[entity.id()] = -1;
+        mIndexToEntity[lastIx] = 0;
     }
 
-    bool hasData(const Entity entity) const { return mEntityToIndex.find(entity.id()) != mEntityToIndex.end(); }
+    bool hasData(const Entity entity) const { return mEntityToIndex[entity.id()] != -1; }
 
     Corrade::Containers::Optional<T> tryGetData(const Entity entity) {
-        if (mEntityToIndex.find(entity.id()) == mEntityToIndex.end()) {
+        if (!hasData(entity)) {
             return Corrade::Containers::NullOpt;
         }
         const u32 ix = mEntityToIndex.at(entity.id());
@@ -180,7 +183,7 @@ public:
     }
 
     void entityDestroyed(const Entity entity) override {
-        if (mEntityToIndex.find(entity.id()) == mEntityToIndex.end()) {
+        if (!hasData(entity)) {
             return;
         }
         removeData(entity);
@@ -195,10 +198,9 @@ public:
 
 private:
     std::array<T, MAX_ENTITIES> mComponentTable;
-    // could use arrays here:
-    std::unordered_map<EntityID, u32> mEntityToIndex;
-    std::unordered_map<u32, EntityID> mIndexToEntity;
-    u32 mSize;
+    std::array<long, MAX_ENTITIES> mEntityToIndex;
+    std::array<EntityID, MAX_ENTITIES> mIndexToEntity;
+    u32 mSize = 0;
 };
 
 class EntityManager {
@@ -229,25 +231,15 @@ class Exclude;
 
 class ComponentManager {
 public:
-    ComponentManager() = default;
+    ComponentManager() { mComponentToIndex.fill(-1); }
 
     template <typename T>
     void registerComponent() {
         const ComponentType type = getComponentID<T>();
         assert(type < MAX_COMPONENTS && "Registered more than MAX_COMPONENTS components");
-        assert(whal_find(mComponentTypes.begin(), mComponentTypes.end(), type) == mComponentTypes.end() && "Component type already registered");
-        mComponentTypes.push_back(type);
+        assert(getIndex<T>() == -1 && "Component type already registered");
+        mComponentToIndex[type] = mComponentArrays.size();
         mComponentArrays.push_back(Corrade::Containers::pointer<ComponentArray<T>>());
-    }
-
-    template <typename T>
-    Corrade::Containers::Optional<ComponentType> tryGetComponentType() const {
-        const ComponentType type = getComponentID<T>();
-        auto it = whal_find(mComponentTypes.begin(), mComponentTypes.end(), type);
-        if (it == mComponentTypes.end()) {
-            return Corrade::Containers::NullOpt;
-        }
-        return type;
     }
 
     template <typename T>
@@ -257,66 +249,49 @@ public:
 
     template <typename T>
     void addComponent(const Entity entity, T component) {
-        const ComponentType type = getComponentID<T>();
-        auto it = whal_find(mComponentTypes.begin(), mComponentTypes.end(), type);
-        int ix;
-        if (it == mComponentTypes.end()) {
+        long index = getIndex<T>();
+        if (index == -1) {
             registerComponent<T>();
-            ix = mComponentTypes.size() - 1;
-        } else {
-            ix = std::distance(mComponentTypes.begin(), it);
+            index = mComponentArrays.size() - 1;
         }
-        getComponentArray<T>(ix)->addData(entity, component);
+        getComponentArray<T>(index)->addData(entity, component);
     }
 
     template <typename T>
     void setComponent(const Entity entity, T component) {
-        const ComponentType type = getComponentID<T>();
-        auto it = whal_find(mComponentTypes.begin(), mComponentTypes.end(), type);
-        int ix = std::distance(mComponentTypes.begin(), it);
-        getComponentArray<T>(ix)->setData(entity, component);
+        getComponentArray<T>(getIndex<T>())->setData(entity, component);
     }
 
     template <typename T>
     void removeComponent(const Entity entity) const {
-        const ComponentType type = getComponentID<T>();
-        auto it = whal_find(mComponentTypes.begin(), mComponentTypes.end(), type);
-        if (it == mComponentTypes.end()) {
+        const long ix = getIndex<T>();
+        if (ix == -1) {
             return;
         }
-        int ix = std::distance(mComponentTypes.begin(), it);
         getComponentArray<T>(ix)->removeData(entity);
     }
 
     template <typename T>
     bool hasComponent(const Entity entity) const {
-        const ComponentType type = getComponentID<T>();
-        auto it = whal_find(mComponentTypes.begin(), mComponentTypes.end(), type);
-        if (it == mComponentTypes.end()) {
+        const long ix = getIndex<T>();
+        if (ix == -1) {
             return false;
         }
-        int ix = std::distance(mComponentTypes.begin(), it);
         return getComponentArray<T>(ix)->hasData(entity);
     }
 
     template <typename T>
     Corrade::Containers::Optional<T> tryGetComponent(const Entity entity) const {
-        const ComponentType type = getComponentID<T>();
-        auto it = whal_find(mComponentTypes.begin(), mComponentTypes.end(), type);
-        if (it == mComponentTypes.end()) {
+        const long ix = getIndex<T>();
+        if (ix == -1) {
             return Corrade::Containers::NullOpt;
-            // return std::nullopt;
         }
-        int ix = std::distance(mComponentTypes.begin(), it);
         return getComponentArray<T>(ix)->tryGetData(entity);
     }
 
     template <typename T>
     T& getComponent(const Entity entity) const {
-        const ComponentType type = getComponentID<T>();
-        auto it = whal_find(mComponentTypes.begin(), mComponentTypes.end(), type);
-        int ix = std::distance(mComponentTypes.begin(), it);
-        return getComponentArray<T>(ix)->getData(entity);
+        return getComponentArray<T>(getIndex<T>())->getData(entity);
     }
 
     void entityDestroyed(const Entity entity);
@@ -343,7 +318,13 @@ private:
         return static_cast<ComponentArray<T>*>(mComponentArrays[ix].get());
     }
 
-    std::vector<ComponentType> mComponentTypes;
+    template <typename T>
+    long getIndex() const {
+        const ComponentType type = getComponentID<T>();
+        return mComponentToIndex[type];
+    }
+
+    std::array<long, MAX_COMPONENTS> mComponentToIndex;
     std::vector<Corrade::Containers::Pointer<IComponentArray>> mComponentArrays;
 };
 
