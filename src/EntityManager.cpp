@@ -4,7 +4,8 @@
 namespace whal::ecs {
 
 EntityManager::EntityManager() {
-    for (u32 entity = 0; entity < MAX_ENTITIES; entity++) {
+    // entity ID 0 is reserved as a Dummy ID (in case entity creation fails)
+    for (u32 entity = 1; entity < MAX_ENTITIES; entity++) {
         mAvailableIDs.push(entity);
     }
     mActiveEntities.reset();

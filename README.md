@@ -29,3 +29,6 @@ The main changes are:
         - ComponentArray.remove: pop_back
         - EntityManager::mPatterns: would be a vector & would need slightly more management (id->ix map or something)
         - EntityManager::mActiveEntities: is a bitset, would need to convert to a std::vector<bool>
+
+- *considering* having entity creation return a plain `Entity` instead of an `Expected<Entity>` and just having a `bool Entity::isValid() const {return mId != 0}` method instead. The pro would be slightly easier error checking and more readable code. The con would be that it's easier for the end-user to forget that entity creation could fail
+- *considering* having tryGetComponent return a pointer instead of an `Optional<T>` so that manipulating the queried value is easier, rather than needing to call .set
