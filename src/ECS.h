@@ -20,6 +20,11 @@
 typedef uint16_t u16;
 typedef uint32_t u32;
 
+namespace whal {
+struct EntityRenderInfo;
+struct RenderContext;
+}  // namespace whal
+
 #ifndef MAX_ENTITIES
 #define MAX_ENTITIES 5000
 #endif
@@ -378,6 +383,13 @@ public:
     virtual void onUnpause() = 0;
 };
 
+class IRender {
+public:
+    virtual void draw(Entity entity, const RenderContext ctx) const = 0;
+    virtual void addToQueue(std::vector<EntityRenderInfo>& queue) const = 0;
+    virtual bool isPostProcessingUsed() const { return false; }
+};
+
 class AttrUniqueEntity {};
 class AttrUpdateDuringPause {};
 
@@ -475,9 +487,17 @@ public:
 
         Corrade::Containers::Pointer<T> system = Corrade::Containers::pointer<T>();
 
+        // The way these two interfaces are used, it's convenient for these list's indices to match with mSystems
         mUpdateSystems.push_back(toInterfacePtr<T, IUpdate>(system.get()));
         mMonitorSystems.push_back(toInterfacePtr<T, IMonitorSystem>(system.get()));
-        mPauseSystems.push_back(toInterfacePtr<T, IReactToPause>(system.get()));
+
+        // Check other interfaces. These lists don't store nullptrs;
+        if (auto iPtr = toInterfacePtr<T, IReactToPause>(system.get()); iPtr) {
+            mPauseSystems.push_back(iPtr);
+        }
+        if (auto iPtr = toInterfacePtr<T, IRender>(system.get()); iPtr) {
+            mRenderSystems.push_back(iPtr);
+        }
 
         // check attributes
         if (toInterfacePtr<T, AttrUniqueEntity>(system.get())) {
@@ -595,9 +615,7 @@ public:
 
         mIsWorldPaused = true;
         for (auto pSystem : mPauseSystems) {
-            if (pSystem) {
-                pSystem->onPause();
-            }
+            pSystem->onPause();
         }
     }
 
@@ -606,11 +624,11 @@ public:
 
         mIsWorldPaused = false;
         for (auto pSystem : mPauseSystems) {
-            if (pSystem) {
-                pSystem->onUnpause();
-            }
+            pSystem->onUnpause();
         }
     }
+
+    const std::vector<IRender*>& getRenderSystems() const { return mRenderSystems; }
 
 private:
     // assign unique IDs to each system type
@@ -623,9 +641,10 @@ private:
 
     std::unordered_map<SystemId, int> mSystemIdToIndex;
     std::vector<Corrade::Containers::Pointer<SystemBase>> mSystems;
-    std::vector<IUpdate*> mUpdateSystems;
-    std::vector<IMonitorSystem*> mMonitorSystems;
+    std::vector<IUpdate*> mUpdateSystems;          // may contain null ptrs
+    std::vector<IMonitorSystem*> mMonitorSystems;  // may contain null ptrs
     std::vector<IReactToPause*> mPauseSystems;
+    std::vector<IRender*> mRenderSystems;
     std::vector<u16> mAttributes;
 
     std::vector<std::pair<UpdateGroupInfo, std::vector<int>>>
@@ -716,6 +735,8 @@ public:
     T* registerSystem(u16 attributes = 0) const {
         return mSystemManager->registerSystem<T>(attributes);
     }
+
+    const std::vector<IRender*>& getRenderSystems() const { return mSystemManager->getRenderSystems(); }
 
     // this doesn't do anything, but I want the caller code to be understandable
     SystemManager& BeginSystemRegistration() const { return *mSystemManager.get(); }
