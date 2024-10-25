@@ -515,7 +515,6 @@ public:
 
     // register systems which don't implement FixedUpdate
     template <class... T>
-    // requires(std::conjunction_v<!std::derived_from<T, IFixedUpdate>>, ...)
         requires(std::conjunction_v<NotFixedUpdate<T>...>)
     SystemManager& registerSystems(u16 attributes = 0) {
         (registerSystem<T>(attributes), ...);
@@ -554,6 +553,22 @@ public:
         mUpdateGroups.push_back({UpdateGroupInfo(interval, isParallel), std::move(groupIndices)});
 
         return *this;
+    }
+
+    void clear() {
+        for (auto& sys : mSystems) {
+            sys->getEntitiesVirtual().clear();
+        }
+        mSystemIdToIndex.clear();
+        mSystems.clear();
+        mUpdateSystems.clear();
+        mMonitorSystems.clear();
+        mPauseSystems.clear();
+        mRenderSystems.clear();
+        mAttributes.clear();
+        mUpdateGroups.clear();
+        mFrame = 0;
+        mIsWorldPaused = false;
     }
 
     void autoUpdate() {
@@ -749,6 +764,8 @@ public:
     void pause() const { mSystemManager->onPaused(); }
 
     void unpause() const { mSystemManager->onUnpaused(); }
+
+    void clear();
 
 private:
     // no copy

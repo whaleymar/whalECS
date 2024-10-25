@@ -78,4 +78,14 @@ bool World::isActive(Entity entity) const {
     return mEntityManager->isActive(entity);
 }
 
+void World::clear() {
+    mSystemManager->clear();
+    mEntityManager.release();
+    mComponentManager.release();
+    mToKill.clear();
+
+    mEntityManager = Corrade::Containers::pointer<EntityManager>();
+    mComponentManager = Corrade::Containers::pointer<ComponentManager>();
+}
+
 }  // namespace whal::ecs
