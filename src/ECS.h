@@ -20,10 +20,10 @@
 typedef uint16_t u16;
 typedef uint32_t u32;
 
-namespace whal {
+namespace whal::gfx {
 struct EntityRenderInfo;
 struct RenderContext;
-}  // namespace whal
+}  // namespace whal::gfx
 
 #ifndef MAX_ENTITIES
 #define MAX_ENTITIES 5000
@@ -385,8 +385,8 @@ public:
 
 class IRender {
 public:
-    virtual void draw(Entity entity, const RenderContext ctx) const = 0;
-    virtual void addToQueue(std::vector<EntityRenderInfo>& queue) const = 0;
+    virtual void draw(Entity entity, const gfx::RenderContext ctx) const = 0;
+    virtual void addToQueue(std::vector<gfx::EntityRenderInfo>& queue) const = 0;
     virtual bool isPostProcessingUsed() const { return false; }
 };
 
