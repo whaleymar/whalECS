@@ -183,6 +183,7 @@ public:
     }
 
     T& getData(const Entity entity) {
+        assert(hasData(entity) && "getData on entity without component");
         const u32 ix = mEntityToIndex.at(entity.id());
         return mComponentTable.at(ix);
     }
