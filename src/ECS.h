@@ -11,8 +11,8 @@
 #include <unordered_set>
 #include <vector>
 
-#include "CorradeOptional.h"
-#include "CorradePointer.h"
+#include "magnum-singles/CorradeOptional.h"
+#include "magnum-singles/CorradePointer.h"
 
 #include "Expected.h"
 #include "Traits.h"
