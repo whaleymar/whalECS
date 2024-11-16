@@ -386,7 +386,7 @@ public:
 
 class IRender {
 public:
-    virtual void draw(Entity entity, const gfx::RenderContext ctx) const = 0;
+    virtual void draw(const gfx::EntityRenderInfo& entityInfo, const gfx::RenderContext& ctx) const = 0;
     virtual void addToQueue(std::vector<gfx::EntityRenderInfo>& queue) const = 0;
     virtual bool isPostProcessingUsed() const { return false; }
 };
