@@ -458,6 +458,11 @@ I* toInterfacePtr(const T* const ptr) {
     return nullptr;
 }
 
+struct RenderSystemPair {
+    IRender* pIRender;
+    SystemBase* pSystem;
+};
+
 class SystemManager {
     struct UpdateGroupInfo {
         int intervalFrame;
@@ -497,7 +502,7 @@ public:
             mPauseSystems.push_back(iPtr);
         }
         if (auto iPtr = toInterfacePtr<T, IRender>(system.get()); iPtr) {
-            mRenderSystems.push_back(iPtr);
+            mRenderSystems.push_back({iPtr, system.get()});
         }
 
         // check attributes
@@ -644,7 +649,7 @@ public:
         }
     }
 
-    const std::vector<IRender*>& getRenderSystems() const { return mRenderSystems; }
+    const std::vector<RenderSystemPair>& getRenderSystems() const { return mRenderSystems; }
 
 private:
     // assign unique IDs to each system type
@@ -660,7 +665,7 @@ private:
     std::vector<IUpdate*> mUpdateSystems;          // may contain null ptrs
     std::vector<IMonitorSystem*> mMonitorSystems;  // may contain null ptrs
     std::vector<IReactToPause*> mPauseSystems;
-    std::vector<IRender*> mRenderSystems;
+    std::vector<RenderSystemPair> mRenderSystems;
     std::vector<u16> mAttributes;
 
     std::vector<std::pair<UpdateGroupInfo, std::vector<int>>>
@@ -752,7 +757,7 @@ public:
         return mSystemManager->registerSystem<T>(attributes);
     }
 
-    const std::vector<IRender*>& getRenderSystems() const { return mSystemManager->getRenderSystems(); }
+    const std::vector<RenderSystemPair>& getRenderSystems() const { return mSystemManager->getRenderSystems(); }
 
     // this doesn't do anything, but I want the caller code to be understandable
     SystemManager& BeginSystemRegistration() const { return *mSystemManager.get(); }
