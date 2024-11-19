@@ -724,10 +724,7 @@ public:
 
     template <typename T>
     bool hasComponent(const Entity entity) {
-        Pattern componentPattern;
-        componentPattern.set(mComponentManager->getComponentType<T>(), true);
-        return (mEntityManager->getPattern(entity) & componentPattern) == componentPattern;
-        // return mComponentManager->hasComponent<T>(entity);
+        return mEntityManager->getPattern(entity).test(mComponentManager->getComponentType<T>());
     }
 
     template <typename T>
