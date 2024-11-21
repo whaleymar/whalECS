@@ -4,15 +4,14 @@
 #include <bitset>
 #include <cassert>
 #include <concepts>
+#include <memory>
 #include <mutex>
+#include <optional>
 #include <queue>
 #include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-
-#include "magnum-singles/CorradeOptional.h"
-#include "magnum-singles/CorradePointer.h"
 
 #include "Expected.h"
 #include "Traits.h"
@@ -73,7 +72,7 @@ public:
     Entity remove();
 
     template <typename T>
-    Corrade::Containers::Optional<T> tryGet() const;
+    std::optional<T> tryGet() const;
 
     template <typename T>
     T& get() const;
@@ -174,9 +173,9 @@ public:
 
     bool hasData(const Entity entity) const { return mEntityToIndex[entity.id()] != -1; }
 
-    Corrade::Containers::Optional<T> tryGetData(const Entity entity) {
+    std::optional<T> tryGetData(const Entity entity) {
         if (!hasData(entity)) {
-            return Corrade::Containers::NullOpt;
+            return std::nullopt;
         }
         const u32 ix = mEntityToIndex.at(entity.id());
         return mComponentTable.at(ix);
@@ -245,7 +244,7 @@ public:
         assert(type < MAX_COMPONENTS && "Registered more than MAX_COMPONENTS components");
         assert(getIndex<T>() == -1 && "Component type already registered");
         mComponentToIndex[type] = mComponentArrays.size();
-        mComponentArrays.push_back(Corrade::Containers::pointer<ComponentArray<T>>());
+        mComponentArrays.push_back(std::make_unique<ComponentArray<T>>());
     }
 
     template <typename T>
@@ -287,10 +286,10 @@ public:
     }
 
     template <typename T>
-    Corrade::Containers::Optional<T> tryGetComponent(const Entity entity) const {
+    std::optional<T> tryGetComponent(const Entity entity) const {
         const long ix = getIndex<T>();
         if (ix == -1) {
-            return Corrade::Containers::NullOpt;
+            return std::nullopt;
         }
         return getComponentArray<T>(ix)->tryGetData(entity);
     }
@@ -331,7 +330,7 @@ private:
     }
 
     std::array<long, MAX_COMPONENTS> mComponentToIndex;
-    std::vector<Corrade::Containers::Pointer<IComponentArray>> mComponentArrays;
+    std::vector<std::unique_ptr<IComponentArray>> mComponentArrays;
 };
 
 // wrapper type which tells a system that the entity should *not* have this component
@@ -490,7 +489,7 @@ public:
 
         mSystemIdToIndex.insert({id, mSystems.size()});
 
-        Corrade::Containers::Pointer<T> system = Corrade::Containers::pointer<T>();
+        std::unique_ptr<T> system = std::make_unique<T>();
 
         // The way these two interfaces are used, it's convenient for these list's indices to match with mSystems
         mUpdateSystems.push_back(toInterfacePtr<T, IUpdate>(system.get()));
@@ -660,7 +659,7 @@ private:
     }
 
     std::unordered_map<SystemId, int> mSystemIdToIndex;
-    std::vector<Corrade::Containers::Pointer<SystemBase>> mSystems;
+    std::vector<std::unique_ptr<SystemBase>> mSystems;
     std::vector<IUpdate*> mUpdateSystems;          // may contain null ptrs
     std::vector<IMonitorSystem*> mMonitorSystems;  // may contain null ptrs
     std::vector<IReactToPause*> mPauseSystems;
@@ -728,7 +727,7 @@ public:
     }
 
     template <typename T>
-    Corrade::Containers::Optional<T> tryGetComponent(const Entity entity) const {
+    std::optional<T> tryGetComponent(const Entity entity) const {
         return mComponentManager->tryGetComponent<T>(entity);
     }
 
@@ -778,9 +777,9 @@ private:
     // is private because it's a bad idea to use this in game logic. An entity's ID could be recycled at any time
     bool isActive(Entity entity) const;
 
-    Corrade::Containers::Pointer<EntityManager> mEntityManager;
-    Corrade::Containers::Pointer<ComponentManager> mComponentManager;
-    Corrade::Containers::Pointer<SystemManager> mSystemManager;
+    std::unique_ptr<EntityManager> mEntityManager;
+    std::unique_ptr<ComponentManager> mComponentManager;
+    std::unique_ptr<SystemManager> mSystemManager;
     std::unordered_set<Entity, EntityHash> mToKill;
     EntityDeathCallback mDeathCallback = nullptr;
 };
@@ -810,7 +809,7 @@ Entity Entity::remove() {
 }
 
 template <typename T>
-Corrade::Containers::Optional<T> Entity::tryGet() const {
+std::optional<T> Entity::tryGet() const {
     return World::getInstance().tryGetComponent<T>(*this);
 }
 

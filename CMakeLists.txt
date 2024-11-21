@@ -9,7 +9,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 file(GLOB_RECURSE SOURCES_BASE ${PROJECT_SOURCE_DIR}/src/*.cpp ${PROJECT_SOURCE_DIR}/src/*.c ${PROJECT_SOURCE_DIR}/src/*.hpp ${PROJECT_SOURCE_DIR}/src/*.h)
 
-add_executable(whalECS ${SOURCES_BASE})
+add_library(whalECS ${SOURCES_BASE})
 
 target_include_directories(${PROJECT_NAME} 
     PUBLIC src

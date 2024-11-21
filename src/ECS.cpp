@@ -3,8 +3,8 @@
 namespace whal::ecs {
 
 World::World()
-    : mEntityManager(Corrade::Containers::pointer<EntityManager>()), mComponentManager(Corrade::Containers::pointer<ComponentManager>()),
-      mSystemManager(Corrade::Containers::pointer<SystemManager>()) {}
+    : mEntityManager(std::make_unique<EntityManager>()), mComponentManager(std::make_unique<ComponentManager>()),
+      mSystemManager(std::make_unique<SystemManager>()) {}
 
 Expected<Entity> World::entity(bool isAlive) const {
     return mEntityManager->createEntity(isAlive);
@@ -84,8 +84,8 @@ void World::clear() {
     mComponentManager.release();
     mToKill.clear();
 
-    mEntityManager = Corrade::Containers::pointer<EntityManager>();
-    mComponentManager = Corrade::Containers::pointer<ComponentManager>();
+    mEntityManager = std::make_unique<EntityManager>();
+    mComponentManager = std::make_unique<ComponentManager>();
 }
 
 }  // namespace whal::ecs
