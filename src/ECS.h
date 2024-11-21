@@ -236,7 +236,7 @@ class Exclude;
 
 class ComponentManager {
 public:
-    ComponentManager() { mComponentToIndex.fill(-1); }
+    ComponentManager();
 
     template <typename T>
     void registerComponent() {
@@ -245,11 +245,6 @@ public:
         assert(getIndex<T>() == -1 && "Component type already registered");
         mComponentToIndex[type] = mComponentArrays.size();
         mComponentArrays.push_back(std::make_unique<ComponentArray<T>>());
-    }
-
-    template <typename T>
-    ComponentType getComponentType() const {
-        return getComponentID<T>();
     }
 
     template <typename T>
@@ -385,8 +380,17 @@ public:
 
 class IRender {
 public:
+    // Draw a single entity.
     virtual void draw(const gfx::EntityRenderInfo& entityInfo, const gfx::RenderContext& ctx) const = 0;
+
+    // Adds all entities to the draw queue. Culling is performed automatically.
     virtual void addToQueue(std::vector<gfx::EntityRenderInfo>& queue) const = 0;
+};
+
+class IRenderLight {
+public:
+    // Draws all lights to the lighting texture.
+    virtual void draw(const gfx::RenderContext& ctx) const = 0;
 };
 
 class AttrUniqueEntity {};
@@ -502,6 +506,9 @@ public:
         if (auto iPtr = toInterfacePtr<T, IRender>(system.get()); iPtr) {
             mRenderSystems.push_back({iPtr, system.get()});
         }
+        if (auto iPtr = toInterfacePtr<T, IRenderLight>(system.get()); iPtr) {
+            mLightRenderSystems.push_back(iPtr);
+        }
 
         // check attributes
         if (toInterfacePtr<T, AttrUniqueEntity>(system.get())) {
@@ -559,95 +566,15 @@ public:
         return *this;
     }
 
-    void clear() {
-        for (auto& sys : mSystems) {
-            sys->getEntitiesVirtual().clear();
-        }
-        mSystemIdToIndex.clear();
-        mSystems.clear();
-        mUpdateSystems.clear();
-        mMonitorSystems.clear();
-        mPauseSystems.clear();
-        mRenderSystems.clear();
-        mAttributes.clear();
-        mUpdateGroups.clear();
-        mFrame = 0;
-        mIsWorldPaused = false;
-    }
-
-    void autoUpdate() {
-        for (auto& [groupInfo, group] : mUpdateGroups) {
-            // eventually if isParallel then do in parallel RESEARCH
-            if (mFrame % groupInfo.intervalFrame != 0) {
-                continue;
-            }
-            for (auto ix : group) {
-                if (mIsWorldPaused && (mAttributes[ix] & UpdateDuringPause) == 0) {
-                } else {
-                    mUpdateSystems[ix]->update();
-                }
-            }
-        }
-        mFrame++;
-    }
-
-    void onEntityDestroyed(const Entity entity) const {
-        // TODO make thread safe
-        for (size_t i = 0; i < mSystems.size(); i++) {
-            const auto& system = mSystems[i];
-            auto const ix = system->getEntitiesVirtual().find(entity.id());
-            if (ix != system->getEntitiesVirtual().end()) {
-                system->getEntitiesVirtual().erase(entity.id());
-                if (mMonitorSystems[i] != nullptr) {
-                    mMonitorSystems[i]->onRemove(entity);
-                }
-            }
-        }
-    }
-
-    void onEntityPatternChanged(const Entity entity, const Pattern& newEntityPattern) const {
-        // TODO make thread safe
-        for (size_t i = 0; i < mSystems.size(); i++) {
-            auto const ix = mSystems[i]->getEntitiesVirtual().find(entity.id());
-            if (mSystems[i]->isPatternInSystem(newEntityPattern)) {
-                if (ix != mSystems[i]->getEntitiesVirtual().end()) {
-                    // already in system
-                    continue;
-                }
-                assert((!((mAttributes[i] & Attributes::UniqueEntity) > 0) || mSystems[i]->getEntitiesVirtual().size() < 1) &&
-                       "Trying to assign more than one entity to system with UniqueEntity attribute");
-                mSystems[i]->getEntitiesVirtual().insert({entity.id(), entity});
-                if (mMonitorSystems[i] != nullptr) {
-                    mMonitorSystems[i]->onAdd(entity);
-                }
-            } else if (ix != mSystems[i]->getEntitiesVirtual().end()) {
-                if (mMonitorSystems[i] != nullptr) {
-                    mMonitorSystems[i]->onRemove(entity);
-                }
-                mSystems[i]->getEntitiesVirtual().erase(entity.id());
-            }
-        }
-    }
-
-    void onPaused() {
-        assert(!mIsWorldPaused);
-
-        mIsWorldPaused = true;
-        for (auto pSystem : mPauseSystems) {
-            pSystem->onPause();
-        }
-    }
-
-    void onUnpaused() {
-        assert(mIsWorldPaused);
-
-        mIsWorldPaused = false;
-        for (auto pSystem : mPauseSystems) {
-            pSystem->onUnpause();
-        }
-    }
+    void clear();
+    void autoUpdate();
+    void onEntityDestroyed(const Entity entity) const;
+    void onEntityPatternChanged(const Entity entity, const Pattern& newEntityPattern) const;
+    void onPaused();
+    void onUnpaused();
 
     const std::vector<RenderSystemPair>& getRenderSystems() const { return mRenderSystems; }
+    const std::vector<IRenderLight*>& getLightSystems() const { return mLightRenderSystems; }
 
 private:
     // assign unique IDs to each system type
@@ -664,6 +591,7 @@ private:
     std::vector<IMonitorSystem*> mMonitorSystems;  // may contain null ptrs
     std::vector<IReactToPause*> mPauseSystems;
     std::vector<RenderSystemPair> mRenderSystems;
+    std::vector<IRenderLight*> mLightRenderSystems;
     std::vector<u16> mAttributes;
 
     std::vector<std::pair<UpdateGroupInfo, std::vector<int>>>
@@ -697,7 +625,7 @@ public:
         mComponentManager->addComponent(entity, component);
 
         auto pattern = mEntityManager->getPattern(entity);
-        pattern.set(mComponentManager->getComponentType<T>(), true);
+        pattern.set(ComponentManager::getComponentID<T>(), true);
         mEntityManager->setPattern(entity, pattern);
 
         if (isActive(entity)) {
@@ -713,7 +641,7 @@ public:
     template <typename T>
     void removeComponent(const Entity entity) {
         auto pattern = mEntityManager->getPattern(entity);
-        pattern.set(mComponentManager->getComponentType<T>(), false);
+        pattern.set(ComponentManager::getComponentID<T>(), false);
         mEntityManager->setPattern(entity, pattern);
         if (isActive(entity)) {
             mSystemManager->onEntityPatternChanged(entity, pattern);  // should always go before removeComponent so we can run onRemove method
@@ -723,7 +651,7 @@ public:
 
     template <typename T>
     bool hasComponent(const Entity entity) {
-        return mEntityManager->getPattern(entity).test(mComponentManager->getComponentType<T>());
+        return mEntityManager->getPattern(entity).test(ComponentManager::getComponentID<T>());
     }
 
     template <typename T>
@@ -734,11 +662,6 @@ public:
     template <typename T>
     T& getComponent(const Entity entity) const {
         return mComponentManager->getComponent<T>(entity);
-    }
-
-    template <typename T>
-    ComponentType getComponentType() const {
-        return mComponentManager->getComponentType<T>();
     }
 
     // SYSTEM
@@ -753,6 +676,7 @@ public:
     }
 
     const std::vector<RenderSystemPair>& getRenderSystems() const { return mSystemManager->getRenderSystems(); }
+    const std::vector<IRenderLight*>& getLightSystems() const { return mSystemManager->getLightSystems(); }
 
     // this doesn't do anything, but I want the caller code to be understandable
     SystemManager& BeginSystemRegistration() const { return *mSystemManager.get(); }

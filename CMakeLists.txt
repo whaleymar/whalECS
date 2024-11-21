@@ -9,7 +9,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 file(GLOB_RECURSE SOURCES_BASE ${PROJECT_SOURCE_DIR}/src/*.cpp ${PROJECT_SOURCE_DIR}/src/*.c ${PROJECT_SOURCE_DIR}/src/*.hpp ${PROJECT_SOURCE_DIR}/src/*.h)
 
-add_library(whalECS ${SOURCES_BASE})
+add_library(whalECS SHARED ${SOURCES_BASE})
 
 target_include_directories(${PROJECT_NAME} 
     PUBLIC src
@@ -17,6 +17,9 @@ target_include_directories(${PROJECT_NAME}
 )
 
 include_directories(lib)
+
+target_compile_options(${PROJECT_NAME} PRIVATE "$<$<CONFIG:DEBUG>:${-O2}>" "-g") 
+target_compile_options(${PROJECT_NAME} PRIVATE "$<$<CONFIG:RELEASE>:${-O2}>")
 
 target_compile_options(whalECS PRIVATE -fno-rtti -fno-exceptions)
 target_compile_options(whalECS PRIVATE -Wall -Wextra -Wdeprecated)

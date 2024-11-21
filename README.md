@@ -19,6 +19,8 @@ The main changes are:
 
 ### Need:
 
+- optimize for empty types (ie tags). there's a std::is_empty_type (or something) i can use to dispatch a different method in ecs::World. If the type is empty i only need to update the bitmask (can use a separate one for tags) and don't need to touch the component manager
+    - will drastically reduce memory usage of tags -- currently using MAX_ENTITIES bytes per tag (so 5kb w/ defaults), this would reduce it to 1 bit
 - thread-safe system methods
 - parallelization
 - queue add/remove operations until end of frame? so i'm only iterating through the system stuff once. also avoids accidental mutation during update loops

@@ -2,6 +2,10 @@
 
 namespace whal::ecs {
 
+ComponentManager::ComponentManager() {
+    mComponentToIndex.fill(-1);
+}
+
 void ComponentManager::entityDestroyed(const Entity entity) {
     for (auto const& componentArray : mComponentArrays) {
         componentArray->entityDestroyed(entity);
