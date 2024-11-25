@@ -4,7 +4,6 @@
 #include <bitset>
 #include <cassert>
 #include <concepts>
-#include <memory>
 #include <mutex>
 #include <optional>
 #include <queue>
@@ -236,6 +235,7 @@ class Exclude;
 class ComponentManager {
 public:
     ComponentManager();
+    ~ComponentManager();
 
     template <typename T>
     void registerComponent() {
@@ -243,7 +243,7 @@ public:
         assert(type < MAX_COMPONENTS && "Registered more than MAX_COMPONENTS components");
         assert(getIndex<T>() == -1 && "Component type already registered");
         mComponentToIndex[type] = mComponentArrays.size();
-        mComponentArrays.push_back(std::make_unique<ComponentArray<T>>());
+        mComponentArrays.push_back(new ComponentArray<T>());
     }
 
     template <typename T>
@@ -314,7 +314,7 @@ public:
 private:
     template <typename T>
     ComponentArray<T>* getComponentArray(int ix) const {
-        return static_cast<ComponentArray<T>*>(mComponentArrays[ix].get());
+        return static_cast<ComponentArray<T>*>(mComponentArrays[ix]);
     }
 
     template <typename T>
@@ -324,7 +324,7 @@ private:
     }
 
     std::array<long, MAX_COMPONENTS> mComponentToIndex;
-    std::vector<std::unique_ptr<IComponentArray>> mComponentArrays;
+    std::vector<IComponentArray*> mComponentArrays;
 };
 
 // wrapper type which tells a system that the entity should *not* have this component
@@ -481,7 +481,7 @@ public:
         const SystemId id = getSystemID<T>();
         assert(mSystemIdToIndex.contains(id) && "System not registered");
 
-        return static_cast<T*>(mSystems[mSystemIdToIndex.at(id)].get());
+        return static_cast<T*>(mSystems[mSystemIdToIndex.at(id)]);
     }
 
     template <class T>
@@ -492,35 +492,34 @@ public:
 
         mSystemIdToIndex.insert({id, mSystems.size()});
 
-        std::unique_ptr<T> system = std::make_unique<T>();
+        T* system = new T;
 
         // The way these two interfaces are used, it's convenient for these list's indices to match with mSystems
-        mUpdateSystems.push_back(toInterfacePtr<T, IUpdate>(system.get()));
-        mMonitorSystems.push_back(toInterfacePtr<T, IMonitorSystem>(system.get()));
+        mUpdateSystems.push_back(toInterfacePtr<T, IUpdate>(system));
+        mMonitorSystems.push_back(toInterfacePtr<T, IMonitorSystem>(system));
 
         // Check other interfaces. These lists don't store nullptrs;
-        if (auto iPtr = toInterfacePtr<T, IReactToPause>(system.get()); iPtr) {
+        if (auto iPtr = toInterfacePtr<T, IReactToPause>(system); iPtr) {
             mPauseSystems.push_back(iPtr);
         }
-        if (auto iPtr = toInterfacePtr<T, IRender>(system.get()); iPtr) {
-            mRenderSystems.push_back({iPtr, system.get()});
+        if (auto iPtr = toInterfacePtr<T, IRender>(system); iPtr) {
+            mRenderSystems.push_back({iPtr, system});
         }
-        if (auto iPtr = toInterfacePtr<T, IRenderLight>(system.get()); iPtr) {
+        if (auto iPtr = toInterfacePtr<T, IRenderLight>(system); iPtr) {
             mLightRenderSystems.push_back(iPtr);
         }
 
         // check attributes
-        if (toInterfacePtr<T, AttrUniqueEntity>(system.get())) {
+        if (toInterfacePtr<T, AttrUniqueEntity>(system)) {
             attributes |= UniqueEntity;
         }
-        if (toInterfacePtr<T, AttrUpdateDuringPause>(system.get())) {
+        if (toInterfacePtr<T, AttrUpdateDuringPause>(system)) {
             attributes |= UpdateDuringPause;
         }
         mAttributes.push_back(attributes);
 
-        T* rawPtr = system.get();
-        mSystems.push_back(std::move(system));
-        return rawPtr;
+        mSystems.push_back(system);
+        return system;
     }
 
     // register systems which don't implement FixedUpdate
@@ -585,7 +584,7 @@ private:
     }
 
     std::unordered_map<SystemId, int> mSystemIdToIndex;
-    std::vector<std::unique_ptr<SystemBase>> mSystems;
+    std::vector<SystemBase*> mSystems;
     std::vector<IUpdate*> mUpdateSystems;          // may contain null ptrs
     std::vector<IMonitorSystem*> mMonitorSystems;  // may contain null ptrs
     std::vector<IReactToPause*> mPauseSystems;
@@ -678,7 +677,7 @@ public:
     const std::vector<IRenderLight*>& getLightSystems() const { return mSystemManager->getLightSystems(); }
 
     // this doesn't do anything, but I want the caller code to be understandable
-    SystemManager& BeginSystemRegistration() const { return *mSystemManager.get(); }
+    SystemManager& BeginSystemRegistration() const { return *mSystemManager; }
 
     void update() {
         mSystemManager->autoUpdate();
@@ -694,15 +693,16 @@ public:
 private:
     // no copy
     World();
+    ~World();
     World(const World&) = delete;
     void operator=(const World&) = delete;
 
     // is private because it's a bad idea to use this in game logic. An entity's ID could be recycled at any time
     bool isActive(Entity entity) const;
 
-    std::unique_ptr<EntityManager> mEntityManager;
-    std::unique_ptr<ComponentManager> mComponentManager;
-    std::unique_ptr<SystemManager> mSystemManager;
+    EntityManager* mEntityManager;
+    ComponentManager* mComponentManager;
+    SystemManager* mSystemManager;
     std::unordered_set<Entity, EntityHash> mToKill;
     EntityDeathCallback mDeathCallback = nullptr;
 };

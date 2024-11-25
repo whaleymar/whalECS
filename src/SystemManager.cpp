@@ -3,8 +3,9 @@
 namespace whal::ecs {
 
 void SystemManager::clear() {
-    for (auto& sys : mSystems) {
+    for (SystemBase* sys : mSystems) {
         sys->getEntitiesVirtual().clear();
+        delete sys;
     }
     mSystemIdToIndex.clear();
     mSystems.clear();

@@ -2,9 +2,13 @@
 
 namespace whal::ecs {
 
-World::World()
-    : mEntityManager(std::make_unique<EntityManager>()), mComponentManager(std::make_unique<ComponentManager>()),
-      mSystemManager(std::make_unique<SystemManager>()) {}
+World::World() : mEntityManager(new EntityManager), mComponentManager(new ComponentManager), mSystemManager(new SystemManager) {}
+
+World::~World() {
+    delete mEntityManager;
+    delete mComponentManager;
+    delete mSystemManager;
+}
 
 Entity World::entity(bool isAlive) const {
     return mEntityManager->createEntity(isAlive);
@@ -80,12 +84,12 @@ bool World::isActive(Entity entity) const {
 
 void World::clear() {
     mSystemManager->clear();
-    mEntityManager.release();
-    mComponentManager.release();
+    delete mEntityManager;
+    delete mComponentManager;
     mToKill.clear();
 
-    mEntityManager = std::make_unique<EntityManager>();
-    mComponentManager = std::make_unique<ComponentManager>();
+    mEntityManager = new EntityManager;
+    mComponentManager = new ComponentManager;
 }
 
 }  // namespace whal::ecs
