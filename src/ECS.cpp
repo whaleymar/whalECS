@@ -6,7 +6,7 @@ World::World()
     : mEntityManager(std::make_unique<EntityManager>()), mComponentManager(std::make_unique<ComponentManager>()),
       mSystemManager(std::make_unique<SystemManager>()) {}
 
-Expected<Entity> World::entity(bool isAlive) const {
+Entity World::entity(bool isAlive) const {
     return mEntityManager->createEntity(isAlive);
 }
 
@@ -37,16 +37,16 @@ void World::killEntities() {
     }
 }
 
-Expected<Entity> World::copy(Entity prefab, bool isActive) const {
-    Expected<Entity> newEntity = entity(false);
-    if (!newEntity.isExpected()) {
+Entity World::copy(Entity prefab, bool isActive) const {
+    Entity newEntity = entity(false);
+    if (!newEntity.isValid()) {
         return newEntity;
     }
-    mComponentManager->copyComponents(prefab, newEntity.value());
-    mEntityManager->setPattern(newEntity.value(), mEntityManager->getPattern(prefab));
+    mComponentManager->copyComponents(prefab, newEntity);
+    mEntityManager->setPattern(newEntity, mEntityManager->getPattern(prefab));
 
     if (isActive) {
-        newEntity.value().activate();
+        newEntity.activate();
     }
 
     return newEntity;

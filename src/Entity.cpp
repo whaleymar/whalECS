@@ -1,11 +1,10 @@
 #include "ECS.h"
-#include "Expected.h"
 
 namespace whal::ecs {
 
-Entity::Entity(EntityID id) : mId(id){};
+Entity::Entity(EntityID id) : mId(id) {};
 
-Expected<Entity> Entity::copy(bool isActive) const {
+Entity Entity::copy(bool isActive) const {
     return World::getInstance().copy(*this, isActive);
 }
 
@@ -19,6 +18,10 @@ void Entity::activate() const {
 
 void Entity::deactivate() const {
     World::getInstance().deactivate(*this);
+}
+
+bool Entity::isValid() const {
+    return mId != 0;
 }
 
 }  // namespace whal::ecs

@@ -11,10 +11,11 @@ EntityManager::EntityManager() {
     mActiveEntities.reset();
 }
 
-Expected<Entity> EntityManager::createEntity(bool isAlive) {
+Entity EntityManager::createEntity(bool isAlive) {
     std::unique_lock<std::mutex> lock{mCreatorMutex};
     if (mEntityCount + 1 >= MAX_ENTITIES) {
-        return Expected<Entity>::error("Cannot allocate any more entities");
+        // TODO logging
+        return Entity{0};
     }
     EntityID id = mAvailableIDs.front();
     mAvailableIDs.pop();
@@ -22,7 +23,7 @@ Expected<Entity> EntityManager::createEntity(bool isAlive) {
     if (isAlive) {
         mActiveEntities.set(static_cast<u32>(id));
     }
-    return Entity(id);
+    return Entity{id};
 }
 
 void EntityManager::destroyEntity(Entity entity) {

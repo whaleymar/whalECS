@@ -13,7 +13,6 @@
 #include <unordered_set>
 #include <vector>
 
-#include "Expected.h"
 #include "Traits.h"
 
 typedef uint16_t u16;
@@ -51,7 +50,6 @@ public:
     Entity(EntityID id);
     friend EntityManager;
     friend SystemManager;
-    friend Expected<Entity>;  // create dummy id on error
     EntityID id() const { return mId; }
 
     EntityID operator()() const { return mId; }
@@ -80,11 +78,12 @@ public:
     template <typename T>
     bool has() const;
 
-    Expected<Entity> copy(bool isActive = true) const;
+    Entity copy(bool isActive = true) const;
 
     void activate() const;
     void deactivate() const;
     void kill() const;
+    bool isValid() const;
 
 private:
     EntityID mId = 0;
@@ -212,7 +211,7 @@ class EntityManager {
 public:
     EntityManager();
 
-    Expected<Entity> createEntity(bool isAlive);
+    Entity createEntity(bool isAlive);
     void destroyEntity(Entity entity);
     void setPattern(Entity entity, const Pattern& pattern);
     Pattern getPattern(Entity entity) const;
@@ -608,11 +607,11 @@ public:
     }
 
     // ENTITY
-    Expected<Entity> entity(bool isAlive = true) const;
+    Entity entity(bool isAlive = true) const;
     void kill(Entity entity);
     void killEntities();  // called by update. Should only be called manually in specific circumstances like scene loading
 
-    Expected<Entity> copy(Entity entity, bool isActive) const;
+    Entity copy(Entity entity, bool isActive) const;
     void activate(Entity entity) const;
     void deactivate(Entity entity) const;
 
