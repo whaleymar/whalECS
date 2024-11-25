@@ -1,3 +1,0 @@
-[submodule "lib/expected"]
-    path = lib/expected
-    url = https://github.com/TartanLlama/expected.git
