@@ -19,7 +19,9 @@ typedef uint32_t u32;
 
 namespace whal::gfx {
 struct EntityRenderInfo;
+struct EntityRenderLoc;
 struct RenderContext;
+class RenderQueue;
 }  // namespace whal::gfx
 
 #ifndef MAX_ENTITIES
@@ -383,7 +385,7 @@ public:
     virtual void draw(const gfx::EntityRenderInfo& entityInfo, const gfx::RenderContext& ctx) const = 0;
 
     // Adds all entities to the draw queue. Culling is performed automatically.
-    virtual void addToQueue(std::vector<gfx::EntityRenderInfo>& queue) const = 0;
+    virtual void addToQueue(gfx::RenderQueue& queue) const = 0;
 };
 
 class IRenderLight {
