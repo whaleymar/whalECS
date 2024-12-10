@@ -417,6 +417,7 @@ public:
     std::unordered_map<EntityID, Entity>& getEntitiesVirtual() override { return mEntities; }
     static std::unordered_map<EntityID, Entity>& getEntitiesMutable() { return mEntities; }
     static std::unordered_map<EntityID, Entity> getEntitiesCopy() { return mEntities; }
+    static const std::unordered_map<EntityID, Entity>& getEntities() { return mEntities; }
     static Entity first() { return mEntities.begin()->second; }
     Pattern getPattern() { return mPattern; }
     bool isPatternInSystem(Pattern pattern) override { return (pattern & mPattern) == mPattern && (pattern & mAntiPattern) == 0; }
