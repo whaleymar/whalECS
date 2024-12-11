@@ -19,7 +19,6 @@ typedef uint32_t u32;
 
 namespace whal::gfx {
 struct EntityRenderInfo;
-struct EntityRenderLoc;
 struct RenderContext;
 class RenderQueue;
 }  // namespace whal::gfx
