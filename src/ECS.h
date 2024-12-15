@@ -85,6 +85,10 @@ public:
     void kill() const;
     bool isValid() const;
 
+    void addChild(Entity child) const;
+    Entity createChild(bool isActive = true) const;
+    void orphan() const;
+
 private:
     EntityID mId = 0;
 };
@@ -211,7 +215,7 @@ class EntityManager {
 public:
     EntityManager();
 
-    Entity createEntity(bool isAlive);
+    Entity createEntity(bool isAlive, Entity parent);
     void destroyEntity(Entity entity);
     void setPattern(Entity entity, const Pattern& pattern);
     Pattern getPattern(Entity entity) const;
@@ -221,6 +225,10 @@ public:
     // returns true if entity was activated, false if it was already active
     bool activate(Entity entity);
     bool deactivate(Entity entity);
+
+    std::unordered_map<Entity, Entity, EntityHash> childToParent;
+    // TODO might want to do an unordered_set to ensure there aren't duplicates
+    std::unordered_map<Entity, std::unordered_set<Entity>, EntityHash> parentToChildren;
 
 private:
     std::queue<EntityID> mAvailableIDs;
@@ -608,7 +616,7 @@ public:
     }
 
     // ENTITY
-    Entity entity(bool isAlive = true) const;
+    Entity entity(bool isActive = true) const;
     void kill(Entity entity);
     void killEntities();  // called by update. Should only be called manually in specific circumstances like scene loading
 
@@ -618,6 +626,10 @@ public:
 
     u32 getEntityCount() const;
     void setEntityDeathCallback(EntityDeathCallback callback);
+
+    void addChild(Entity parent, Entity child);
+    Entity createChild(Entity parent, bool isActive);
+    void orphan(Entity e);
 
     // COMPONENT
     template <typename T>
@@ -707,6 +719,7 @@ private:
     SystemManager* mSystemManager;
     std::unordered_set<Entity, EntityHash> mToKill;
     EntityDeathCallback mDeathCallback = nullptr;
+    Entity mRootEntity;  // I use the "invalid" entity as the world root. Entities created with `entity()` are children of this entity.
 };
 
 template <typename T>

@@ -10,13 +10,18 @@ World::~World() {
     delete mSystemManager;
 }
 
-Entity World::entity(bool isAlive) const {
-    return mEntityManager->createEntity(isAlive);
+Entity World::entity(bool isActive) const {
+    return mEntityManager->createEntity(isActive, mRootEntity);
 }
 
 // works for inactive entities too, trust me
 void World::kill(Entity entity) {
     mToKill.insert(entity);
+
+    // recursively kill child entities
+    for (Entity child : mEntityManager->parentToChildren[entity]) {
+        kill(child);
+    }
 }
 
 void World::killEntities() {
@@ -30,6 +35,7 @@ void World::killEntities() {
             }
             mSystemManager->onEntityDestroyed(entityToKill);  // this goes first so onRemove can fetch components before
                                                               // they're deallocated
+            orphan(entityToKill);
             mEntityManager->destroyEntity(entityToKill);
             mComponentManager->entityDestroyed(entityToKill);
         }
@@ -48,6 +54,7 @@ Entity World::copy(Entity prefab, bool isActive) const {
     }
     mComponentManager->copyComponents(prefab, newEntity);
     mEntityManager->setPattern(newEntity, mEntityManager->getPattern(prefab));
+    // TODO copy parent? Or maybe childof prefab?
 
     if (isActive) {
         newEntity.activate();
@@ -61,12 +68,22 @@ void World::activate(Entity entity) const {
         auto pattern = mEntityManager->getPattern(entity);
         mSystemManager->onEntityPatternChanged(entity, pattern);
     }
+
+    // recursively activate children
+    for (Entity child : mEntityManager->parentToChildren[entity]) {
+        activate(child);
+    }
 }
 
 void World::deactivate(Entity entity) const {
     // remove from systems but keep in entity manager and component manager
     if (mEntityManager->deactivate(entity)) {
         mSystemManager->onEntityDestroyed(entity);
+    }
+
+    // recursively deactivate children
+    for (Entity child : mEntityManager->parentToChildren[entity]) {
+        deactivate(child);
     }
 }
 
@@ -76,6 +93,32 @@ u32 World::getEntityCount() const {
 
 void World::setEntityDeathCallback(EntityDeathCallback callback) {
     mDeathCallback = callback;
+}
+
+void World::addChild(Entity parent, Entity child) {
+    mEntityManager->parentToChildren[parent].insert(child);
+}
+
+Entity World::createChild(Entity parent, bool isActive) {
+    return mEntityManager->createEntity(isActive, parent);
+}
+
+void World::orphan(Entity e) {
+    Entity oldParent = mEntityManager->childToParent[e];
+    if (oldParent == mRootEntity) {
+        // cannot orphan top-level parent
+        return;
+    }
+
+    mEntityManager->childToParent[e] = mRootEntity;
+
+    // there are no guarantees on which order parents/children are deleted if the deletes happen on the same frame.
+    // BUT i don't think I touch a parent's list of children when it dies, so this should be fine?
+    mEntityManager->parentToChildren[oldParent].erase(e);
+
+    // auto it = mEntityManager->parentToChildren[oldParent].find(e);
+    // if (it != mEntityManager->parentToChildren[oldParent].end()) {
+    // }
 }
 
 bool World::isActive(Entity entity) const {

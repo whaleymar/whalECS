@@ -11,7 +11,7 @@ EntityManager::EntityManager() {
     mActiveEntities.reset();
 }
 
-Entity EntityManager::createEntity(bool isAlive) {
+Entity EntityManager::createEntity(bool isAlive, Entity parent) {
     std::unique_lock<std::mutex> lock{mCreatorMutex};
     if (mEntityCount + 1 >= MAX_ENTITIES) {
         // TODO logging
@@ -20,10 +20,15 @@ Entity EntityManager::createEntity(bool isAlive) {
     EntityID id = mAvailableIDs.front();
     mAvailableIDs.pop();
     mEntityCount++;
-    if (isAlive) {
+    if (isActive(parent) && isAlive) {
         mActiveEntities.set(static_cast<u32>(id));
     }
-    return Entity{id};
+
+    const Entity self = Entity{id};
+    parentToChildren[self].clear();         // no children
+    parentToChildren[parent].insert(self);  // add self as child of parent
+    childToParent[self] = parent;           // add our parent
+    return self;
 }
 
 void EntityManager::destroyEntity(Entity entity) {

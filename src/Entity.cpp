@@ -24,4 +24,16 @@ bool Entity::isValid() const {
     return mId != 0;
 }
 
+void Entity::addChild(ecs::Entity child) const {
+    World::getInstance().addChild(*this, child);
+}
+
+ecs::Entity Entity::createChild(bool isActive) const {
+    return World::getInstance().createChild(*this, isActive);
+}
+
+void Entity::orphan() const {
+    World::getInstance().orphan(*this);
+}
+
 }  // namespace whal::ecs
