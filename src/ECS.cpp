@@ -35,7 +35,7 @@ void World::killEntities() {
             }
             mSystemManager->onEntityDestroyed(entityToKill);  // this goes first so onRemove can fetch components before
                                                               // they're deallocated
-            orphan(entityToKill);
+            unparent(entityToKill);
             mEntityManager->destroyEntity(entityToKill);
             mComponentManager->entityDestroyed(entityToKill);
         }
@@ -54,7 +54,10 @@ Entity World::copy(Entity prefab, bool isActive) const {
     }
     mComponentManager->copyComponents(prefab, newEntity);
     mEntityManager->setPattern(newEntity, mEntityManager->getPattern(prefab));
-    // TODO copy parent? Or maybe childof prefab?
+
+    // copy prefab's parent
+    mEntityManager->childToParent[newEntity] = mEntityManager->childToParent[prefab];
+    mEntityManager->parentToChildren[mEntityManager->childToParent[newEntity]].insert(newEntity);
 
     if (isActive) {
         newEntity.activate();
@@ -96,6 +99,9 @@ void World::setEntityDeathCallback(EntityDeathCallback callback) {
 }
 
 void World::addChild(Entity parent, Entity child) {
+    Entity oldParent = mEntityManager->childToParent[child];
+    mEntityManager->childToParent[child] = parent;
+    mEntityManager->parentToChildren[oldParent].erase(child);
     mEntityManager->parentToChildren[parent].insert(child);
 }
 
@@ -115,10 +121,13 @@ void World::orphan(Entity e) {
     // there are no guarantees on which order parents/children are deleted if the deletes happen on the same frame.
     // BUT i don't think I touch a parent's list of children when it dies, so this should be fine?
     mEntityManager->parentToChildren[oldParent].erase(e);
+    mEntityManager->parentToChildren[mRootEntity].insert(e);
+}
 
-    // auto it = mEntityManager->parentToChildren[oldParent].find(e);
-    // if (it != mEntityManager->parentToChildren[oldParent].end()) {
-    // }
+void World::unparent(Entity e) {
+    Entity oldParent = mEntityManager->childToParent[e];
+    mEntityManager->childToParent.erase(e);
+    mEntityManager->parentToChildren[oldParent].erase(e);
 }
 
 bool World::isActive(Entity entity) const {

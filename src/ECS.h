@@ -134,9 +134,6 @@ public:
         mEntityToIndex.fill(-1);
         mIndexToEntity.fill(0);
     }
-    // TODO
-    // static_assert(std::is_trivial_v<T>, "Component is not trivial type (see
-    // https://en.cppreference.com/w/cpp/language/classes#Trivial_class)");
     void addData(const Entity entity, T component) {
         if (hasData(entity)) {
             const u32 ix = mEntityToIndex[entity.id()];
@@ -227,8 +224,7 @@ public:
     bool deactivate(Entity entity);
 
     std::unordered_map<Entity, Entity, EntityHash> childToParent;
-    // TODO might want to do an unordered_set to ensure there aren't duplicates
-    std::unordered_map<Entity, std::unordered_set<Entity>, EntityHash> parentToChildren;
+    std::unordered_map<Entity, std::unordered_set<Entity, EntityHash>, EntityHash> parentToChildren;
 
 private:
     std::queue<EntityID> mAvailableIDs;
@@ -629,7 +625,8 @@ public:
 
     void addChild(Entity parent, Entity child);
     Entity createChild(Entity parent, bool isActive);
-    void orphan(Entity e);
+    void orphan(Entity e);    // makes mRootEntity the parent of `e`
+    void unparent(Entity e);  // removes `e` from all parent lists
 
     // COMPONENT
     template <typename T>

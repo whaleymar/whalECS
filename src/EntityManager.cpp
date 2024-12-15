@@ -17,10 +17,10 @@ Entity EntityManager::createEntity(bool isAlive, Entity parent) {
         // TODO logging
         return Entity{0};
     }
-    EntityID id = mAvailableIDs.front();
+    const EntityID id = mAvailableIDs.front();
     mAvailableIDs.pop();
     mEntityCount++;
-    if (isActive(parent) && isAlive) {
+    if ((parent.id() == 0 || isActive(parent)) && isAlive) {
         mActiveEntities.set(static_cast<u32>(id));
     }
 
