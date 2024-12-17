@@ -94,22 +94,22 @@ u32 World::getEntityCount() const {
     return mEntityManager->getEntityCount();
 }
 
-void World::setEntityDeathCallback(EntityDeathCallback callback) {
+void World::setEntityDeathCallback(EntityCallback callback) {
     mDeathCallback = callback;
 }
 
-void World::addChild(Entity parent, Entity child) {
+void World::addChild(Entity parent, Entity child) const {
     Entity oldParent = mEntityManager->childToParent[child];
     mEntityManager->childToParent[child] = parent;
     mEntityManager->parentToChildren[oldParent].erase(child);
     mEntityManager->parentToChildren[parent].insert(child);
 }
 
-Entity World::createChild(Entity parent, bool isActive) {
+Entity World::createChild(Entity parent, bool isActive) const {
     return mEntityManager->createEntity(isActive, parent);
 }
 
-void World::orphan(Entity e) {
+void World::orphan(Entity e) const {
     Entity oldParent = mEntityManager->childToParent[e];
     if (oldParent == mRootEntity) {
         // cannot orphan top-level parent
@@ -124,10 +124,23 @@ void World::orphan(Entity e) {
     mEntityManager->parentToChildren[mRootEntity].insert(e);
 }
 
-void World::unparent(Entity e) {
+void World::unparent(Entity e) const {
     Entity oldParent = mEntityManager->childToParent[e];
     mEntityManager->childToParent.erase(e);
     mEntityManager->parentToChildren[oldParent].erase(e);
+}
+
+void World::forChild(Entity e, EntityCallback callback, bool isRecursive) const {
+    if (isRecursive) {
+        for (const Entity& child : mEntityManager->parentToChildren[e]) {
+            callback(child);
+            forChild(child, callback, true);
+        }
+    } else {
+        for (const Entity& child : mEntityManager->parentToChildren[e]) {
+            callback(child);
+        }
+    }
 }
 
 bool World::isActive(Entity entity) const {

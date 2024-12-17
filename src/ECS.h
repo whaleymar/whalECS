@@ -42,7 +42,7 @@ using Pattern = std::bitset<MAX_COMPONENTS>;
 using SystemId = u16;
 
 class Entity;
-using EntityDeathCallback = void (*)(Entity);
+using EntityCallback = void (*)(Entity);
 
 class Entity {
 public:
@@ -88,6 +88,7 @@ public:
     void addChild(Entity child) const;
     Entity createChild(bool isActive = true) const;
     void orphan() const;
+    void forChild(EntityCallback callback, bool isRecursive = false);
 
 private:
     EntityID mId = 0;
@@ -621,12 +622,13 @@ public:
     void deactivate(Entity entity) const;
 
     u32 getEntityCount() const;
-    void setEntityDeathCallback(EntityDeathCallback callback);
+    void setEntityDeathCallback(EntityCallback callback);
 
-    void addChild(Entity parent, Entity child);
-    Entity createChild(Entity parent, bool isActive);
-    void orphan(Entity e);    // makes mRootEntity the parent of `e`
-    void unparent(Entity e);  // removes `e` from all parent lists
+    void addChild(Entity parent, Entity child) const;
+    Entity createChild(Entity parent, bool isActive) const;
+    void orphan(Entity e) const;    // makes mRootEntity the parent of `e`
+    void unparent(Entity e) const;  // removes `e` from all parent lists
+    void forChild(Entity e, EntityCallback callback, bool isRecursive) const;
 
     // COMPONENT
     template <typename T>
@@ -715,7 +717,7 @@ private:
     ComponentManager* mComponentManager;
     SystemManager* mSystemManager;
     std::unordered_set<Entity, EntityHash> mToKill;
-    EntityDeathCallback mDeathCallback = nullptr;
+    EntityCallback mDeathCallback = nullptr;
     Entity mRootEntity;  // I use the "invalid" entity as the world root. Entities created with `entity()` are children of this entity.
 };
 

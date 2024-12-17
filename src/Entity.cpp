@@ -36,4 +36,8 @@ void Entity::orphan() const {
     World::getInstance().orphan(*this);
 }
 
+void Entity::forChild(EntityCallback callback, bool isRecursive) {
+    World::getInstance().forChild(*this, callback, isRecursive);
+}
+
 }  // namespace whal::ecs
