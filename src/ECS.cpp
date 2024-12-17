@@ -11,7 +11,11 @@ World::~World() {
 }
 
 Entity World::entity(bool isActive) const {
-    return mEntityManager->createEntity(isActive, mRootEntity);
+    Entity e = mEntityManager->createEntity(isActive, mRootEntity);
+    if (e.isValid() && mCreateCallback) {
+        mCreateCallback(e);
+    }
+    return e;
 }
 
 // works for inactive entities too, trust me
@@ -30,7 +34,7 @@ void World::killEntities() {
         auto tmpToKill = std::move(mToKill);
         mToKill.clear();
         for (auto entityToKill : tmpToKill) {
-            if (mDeathCallback != nullptr) {
+            if (mDeathCallback) {
                 mDeathCallback(entityToKill);
             }
             mSystemManager->onEntityDestroyed(entityToKill);  // this goes first so onRemove can fetch components before
@@ -98,15 +102,34 @@ void World::setEntityDeathCallback(EntityCallback callback) {
     mDeathCallback = callback;
 }
 
+void World::setEntityCreateCallback(EntityCallback callback) {
+    mCreateCallback = callback;
+}
+
+void World::setEntityChildCreateCallback(EntityPairCallback callback) {
+    mChildCreateCallback = callback;
+}
+
+void World::setEntityAdoptCallback(EntityPairCallback callback) {
+    mAdoptCallback = callback;
+}
+
 void World::addChild(Entity parent, Entity child) const {
     Entity oldParent = mEntityManager->childToParent[child];
     mEntityManager->childToParent[child] = parent;
     mEntityManager->parentToChildren[oldParent].erase(child);
     mEntityManager->parentToChildren[parent].insert(child);
+    if (parent.isValid() && child.isValid() && mAdoptCallback) {
+        mAdoptCallback(child, parent);
+    }
 }
 
 Entity World::createChild(Entity parent, bool isActive) const {
-    return mEntityManager->createEntity(isActive, parent);
+    Entity e = mEntityManager->createEntity(isActive, parent);
+    if (e.isValid() && mChildCreateCallback) {
+        mChildCreateCallback(e, parent);
+    }
+    return e;
 }
 
 void World::orphan(Entity e) const {
@@ -141,6 +164,14 @@ void World::forChild(Entity e, EntityCallback callback, bool isRecursive) const 
             callback(child);
         }
     }
+}
+
+Entity World::parent(Entity e) const {
+    return mEntityManager->childToParent[e];
+}
+
+const std::unordered_set<Entity, EntityHash>& World::children(Entity e) const {
+    return mEntityManager->parentToChildren[e];
 }
 
 bool World::isActive(Entity entity) const {

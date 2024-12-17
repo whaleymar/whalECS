@@ -40,4 +40,12 @@ void Entity::forChild(EntityCallback callback, bool isRecursive) {
     World::getInstance().forChild(*this, callback, isRecursive);
 }
 
+Entity Entity::parent() const {
+    return World::getInstance().parent(*this);
+}
+
+const std::unordered_set<Entity, EntityHash>& Entity::children() const {
+    return World::getInstance().children(*this);
+}
+
 }  // namespace whal::ecs
