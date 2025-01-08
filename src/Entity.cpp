@@ -36,7 +36,7 @@ void Entity::orphan() const {
     World::getInstance().orphan(*this);
 }
 
-void Entity::forChild(EntityCallback callback, bool isRecursive) {
+void Entity::forChild(EntityCallback callback, bool isRecursive) const {
     World::getInstance().forChild(*this, callback, isRecursive);
 }
 

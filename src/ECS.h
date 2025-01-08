@@ -90,7 +90,7 @@ public:
     void addChild(Entity child) const;
     Entity createChild(bool isActive = true) const;
     void orphan() const;
-    void forChild(EntityCallback callback, bool isRecursive = false);
+    void forChild(EntityCallback callback, bool isRecursive = false) const;
     Entity parent() const;                                           // parent getter
     const std::unordered_set<Entity, EntityHash>& children() const;  // children getter
 
