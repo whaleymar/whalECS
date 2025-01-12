@@ -114,64 +114,10 @@ void World::setEntityAdoptCallback(EntityPairCallback callback) {
     mAdoptCallback = callback;
 }
 
-void World::addChild(Entity parent, Entity child) const {
-    Entity oldParent = mEntityManager->childToParent[child];
-    mEntityManager->childToParent[child] = parent;
-    mEntityManager->parentToChildren[oldParent].erase(child);
-    mEntityManager->parentToChildren[parent].insert(child);
-    if (parent.isValid() && child.isValid() && mAdoptCallback) {
-        mAdoptCallback(child, parent);
-    }
-}
-
-Entity World::createChild(Entity parent, bool isActive) const {
-    Entity e = mEntityManager->createEntity(isActive, parent);
-    if (e.isValid() && mChildCreateCallback) {
-        mChildCreateCallback(e, parent);
-    }
-    return e;
-}
-
-void World::orphan(Entity e) const {
-    Entity oldParent = mEntityManager->childToParent[e];
-    if (oldParent == mRootEntity) {
-        // cannot orphan top-level parent
-        return;
-    }
-
-    mEntityManager->childToParent[e] = mRootEntity;
-
-    // there are no guarantees on which order parents/children are deleted if the deletes happen on the same frame.
-    // BUT i don't think I touch a parent's list of children when it dies, so this should be fine?
-    mEntityManager->parentToChildren[oldParent].erase(e);
-    mEntityManager->parentToChildren[mRootEntity].insert(e);
-}
-
 void World::unparent(Entity e) const {
     Entity oldParent = mEntityManager->childToParent[e];
     mEntityManager->childToParent.erase(e);
     mEntityManager->parentToChildren[oldParent].erase(e);
-}
-
-void World::forChild(Entity e, EntityCallback callback, bool isRecursive) const {
-    if (isRecursive) {
-        for (const Entity& child : mEntityManager->parentToChildren[e]) {
-            callback(child);
-            forChild(child, callback, true);
-        }
-    } else {
-        for (const Entity& child : mEntityManager->parentToChildren[e]) {
-            callback(child);
-        }
-    }
-}
-
-Entity World::parent(Entity e) const {
-    return mEntityManager->childToParent[e];
-}
-
-const std::unordered_set<Entity, EntityHash>& World::children(Entity e) const {
-    return mEntityManager->parentToChildren[e];
 }
 
 bool World::isActive(Entity entity) const {

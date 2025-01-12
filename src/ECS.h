@@ -89,8 +89,11 @@ public:
 
     void addChild(Entity child) const;
     Entity createChild(bool isActive = true) const;
-    void orphan() const;
-    void forChild(EntityCallback callback, bool isRecursive = false) const;
+    void orphan() const;  // makes mRootEntity the parent of `e`
+
+    template <typename... T>
+    void forChild(void(callback)(ecs::Entity, T...), bool isRecursive, T... args) const;
+
     Entity parent() const;                                           // parent getter
     const std::unordered_set<Entity, EntityHash>& children() const;  // children getter
 
@@ -610,6 +613,8 @@ private:
 };
 
 class World {
+    friend Entity;
+
 public:
     inline static World& getInstance() {
         static World instance;
@@ -631,58 +636,7 @@ public:
     void setEntityChildCreateCallback(EntityPairCallback callback);
     void setEntityAdoptCallback(EntityPairCallback callback);
 
-    void addChild(Entity parent, Entity child) const;
-    Entity createChild(Entity parent, bool isActive) const;
-    void orphan(Entity e) const;    // makes mRootEntity the parent of `e`
     void unparent(Entity e) const;  // removes `e` from all parent lists
-    void forChild(Entity e, EntityCallback callback, bool isRecursive) const;
-    Entity parent(Entity e) const;
-    const std::unordered_set<Entity, EntityHash>& children(Entity e) const;
-
-    // COMPONENT
-    template <typename T>
-    void addComponent(const Entity entity, T component) {
-        mComponentManager->addComponent(entity, component);
-
-        auto pattern = mEntityManager->getPattern(entity);
-        pattern.set(ComponentManager::getComponentID<T>(), true);
-        mEntityManager->setPattern(entity, pattern);
-
-        if (isActive(entity)) {
-            mSystemManager->onEntityPatternChanged(entity, pattern);  // should always go after addComponent so onAdd can run w/out errors
-        }
-    }
-
-    template <typename T>
-    void setComponent(const Entity entity, T component) {
-        mComponentManager->setComponent(entity, component);
-    }
-
-    template <typename T>
-    void removeComponent(const Entity entity) {
-        auto pattern = mEntityManager->getPattern(entity);
-        pattern.set(ComponentManager::getComponentID<T>(), false);
-        mEntityManager->setPattern(entity, pattern);
-        if (isActive(entity)) {
-            mSystemManager->onEntityPatternChanged(entity, pattern);  // should always go before removeComponent so we can run onRemove method
-        }
-        mComponentManager->removeComponent<T>(entity);
-    }
-
-    template <typename T>
-    bool hasComponent(const Entity entity) {
-        return mEntityManager->getPattern(entity).test(ComponentManager::getComponentID<T>());
-    }
-
-    template <typename T>
-    std::optional<T> tryGetComponent(const Entity entity) const {
-        return mComponentManager->tryGetComponent<T>(entity);
-    }
-
-    template <typename T>
-    T& getComponent(const Entity entity) const {
-        return mComponentManager->getComponent<T>(entity);
-    }
 
     // SYSTEM
     template <typename T>
@@ -735,41 +689,70 @@ private:
 
 template <typename T>
 Entity Entity::add(T component) {
-    World::getInstance().addComponent<T>(*this, component);
+    const World& world = World::getInstance();
+    world.mComponentManager->addComponent(*this, component);
+    Pattern pattern = world.mEntityManager->getPattern(*this);
+    pattern.set(ComponentManager::getComponentID<T>(), true);
+    world.mEntityManager->setPattern(*this, pattern);
+    if (world.isActive(*this)) {
+        world.mSystemManager->onEntityPatternChanged(*this, pattern);
+    }
     return *this;
 }
 
 template <typename T>
 Entity Entity::add() {
-    World::getInstance().addComponent<T>(*this, T());
+    add(T());
     return *this;
 }
 
 template <typename T>
 Entity Entity::set(T component) const {
-    World::getInstance().setComponent<T>(*this, component);
+    World::getInstance().mComponentManager->setComponent(*this, component);
     return *this;
 }
 
 template <typename T>
 Entity Entity::remove() {
-    World::getInstance().removeComponent<T>(*this);
+    // World::getInstance().removeComponent<T>(*this);
+    const World& world = World::getInstance();
+    Pattern pattern = world.mEntityManager->getPattern(*this);
+    pattern.set(ComponentManager::getComponentID<T>(), false);
+    world.mEntityManager->setPattern(*this, pattern);
+    if (world.isActive(*this)) {
+        world.mSystemManager->onEntityPatternChanged(*this, pattern);  // should always go before removeComponent so we can run onRemove method
+    }
+    world.mComponentManager->removeComponent<T>(*this);
     return *this;
 }
 
 template <typename T>
 std::optional<T> Entity::tryGet() const {
-    return World::getInstance().tryGetComponent<T>(*this);
+    return World::getInstance().mComponentManager->tryGetComponent<T>(*this);
 }
 
 template <typename T>
 T& Entity::get() const {
-    return World::getInstance().getComponent<T>(*this);
+    return World::getInstance().mComponentManager->getComponent<T>(*this);
 }
 
 template <typename T>
 bool Entity::has() const {
-    return World::getInstance().hasComponent<T>(*this);
+    return World::getInstance().mEntityManager->getPattern(*this).test(ComponentManager::getComponentID<T>());
+}
+
+template <typename... T>
+void Entity::forChild(void(callback)(ecs::Entity, T...), bool isRecursive, T... args) const {
+    if (isRecursive) {
+        for (const Entity& child : World::getInstance().mEntityManager->parentToChildren[*this]) {
+            callback(child, args...);
+            child.forChild(callback, true, args...);
+        }
+    } else {
+        for (const Entity& child : World::getInstance().mEntityManager->parentToChildren[*this]) {
+            callback(child, args...);
+        }
+    }
 }
 
 }  // namespace whal::ecs

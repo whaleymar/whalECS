@@ -25,27 +25,48 @@ bool Entity::isValid() const {
 }
 
 void Entity::addChild(ecs::Entity child) const {
-    World::getInstance().addChild(*this, child);
+    const World& world = World::getInstance();
+    Entity oldParent = world.mEntityManager->childToParent[child];
+    world.mEntityManager->childToParent[child] = *this;
+    world.mEntityManager->parentToChildren[oldParent].erase(child);
+    world.mEntityManager->parentToChildren[*this].insert(child);
+    if (isValid() && child.isValid() && world.mAdoptCallback) {
+        world.mAdoptCallback(child, *this);
+    }
 }
 
 ecs::Entity Entity::createChild(bool isActive) const {
-    return World::getInstance().createChild(*this, isActive);
+    const World& world = World::getInstance();
+    Entity e = world.mEntityManager->createEntity(isActive, *this);
+    if (e.isValid() && world.mChildCreateCallback) {
+        world.mChildCreateCallback(e, *this);
+    }
+    return e;
 }
 
 void Entity::orphan() const {
-    World::getInstance().orphan(*this);
-}
+    // World::getInstance().orphan(*this);
+    const World& world = World::getInstance();
+    Entity oldParent = world.mEntityManager->childToParent[*this];
+    if (oldParent == world.mRootEntity) {
+        // cannot orphan top-level parent
+        return;
+    }
 
-void Entity::forChild(EntityCallback callback, bool isRecursive) const {
-    World::getInstance().forChild(*this, callback, isRecursive);
+    world.mEntityManager->childToParent[*this] = world.mRootEntity;
+
+    // there are no guarantees on which order parents/children are deleted if the deletes happen on the same frame.
+    // BUT i don't think I touch a parent's list of children when it dies, so this should be fine?
+    world.mEntityManager->parentToChildren[oldParent].erase(*this);
+    world.mEntityManager->parentToChildren[world.mRootEntity].insert(*this);
 }
 
 Entity Entity::parent() const {
-    return World::getInstance().parent(*this);
+    return World::getInstance().mEntityManager->childToParent[*this];
 }
 
 const std::unordered_set<Entity, EntityHash>& Entity::children() const {
-    return World::getInstance().children(*this);
+    return World::getInstance().mEntityManager->parentToChildren[*this];
 }
 
 }  // namespace whal::ecs
