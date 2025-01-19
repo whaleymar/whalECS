@@ -46,6 +46,10 @@ Pattern EntityManager::getPattern(Entity entity) const {
     return mPatterns[entity.mId];
 }
 
+u32 EntityManager::getActiveEntityCount() const {
+    return mActiveEntities.count();
+}
+
 bool EntityManager::isActive(Entity entity) const {
     return mActiveEntities.test(static_cast<u32>(entity.id()));
 }

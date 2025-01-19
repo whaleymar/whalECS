@@ -225,6 +225,7 @@ public:
     void setPattern(Entity entity, const Pattern& pattern);
     Pattern getPattern(Entity entity) const;
     u32 getEntityCount() const { return mEntityCount; }
+    u32 getActiveEntityCount() const;
     bool isActive(Entity entity) const;
 
     // returns true if entity was activated, false if it was already active
@@ -323,6 +324,8 @@ public:
     static inline ComponentType getComponentID() {
         return T::COMPONENT_TYPE;
     }
+
+    u32 getRegisteredCount() const { return mComponentArrays.size(); }
 
 private:
     template <typename T>
@@ -621,6 +624,9 @@ public:
         return instance;
     }
 
+    // COMPONENT
+    u32 getComponentCount() const;
+
     // ENTITY
     Entity entity(bool isActive = true) const;
     void kill(Entity entity);
@@ -631,6 +637,7 @@ public:
     void deactivate(Entity entity) const;
 
     u32 getEntityCount() const;
+    u32 getActiveEntityCount() const;
     void setEntityDeathCallback(EntityCallback callback);
     void setEntityCreateCallback(EntityCallback callback);
     void setEntityChildCreateCallback(EntityPairCallback callback);

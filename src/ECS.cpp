@@ -10,6 +10,10 @@ World::~World() {
     delete mSystemManager;
 }
 
+u32 World::getComponentCount() const {
+    return mComponentManager->getRegisteredCount();
+}
+
 Entity World::entity(bool isActive) const {
     Entity e = mEntityManager->createEntity(isActive, mRootEntity);
     if (e.isValid() && mCreateCallback) {
@@ -96,6 +100,10 @@ void World::deactivate(Entity entity) const {
 
 u32 World::getEntityCount() const {
     return mEntityManager->getEntityCount();
+}
+
+u32 World::getActiveEntityCount() const {
+    return mEntityManager->getActiveEntityCount();
 }
 
 void World::setEntityDeathCallback(EntityCallback callback) {
