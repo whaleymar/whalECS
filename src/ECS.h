@@ -61,6 +61,9 @@ public:
     template <typename T>
     Entity add(T component);
 
+    // template <typename T>
+    // Entity add(T&& component);
+
     template <typename T>
     Entity add();
 
@@ -142,21 +145,23 @@ public:
         mEntityToIndex.fill(-1);
         mIndexToEntity.fill(0);
     }
-    void addData(const Entity entity, T component) {
+    void addData(const Entity entity, T&& component) {
         if (hasData(entity)) {
+            // overwrite the current value
             const u32 ix = mEntityToIndex[entity.id()];
-            mComponentTable[ix] = component;
+            mComponentTable[ix] = std::move(component);
             return;
         }
+        // register new entity
         const u32 ix = mSize++;
         mEntityToIndex[entity.id()] = ix;
         mIndexToEntity[ix] = entity.id();
-        mComponentTable[ix] = component;
+        mComponentTable[ix] = std::move(component);
     }
 
-    void setData(const Entity entity, T component) {
+    void setData(const Entity entity, T&& component) {
         assert(mEntityToIndex[entity.id()] != -1 && "cannot set component value without adding it to the entity first");
-        mComponentTable[mEntityToIndex[entity.id()]] = component;
+        mComponentTable[mEntityToIndex[entity.id()]] = std::move(component);
     }
 
     void removeData(const Entity entity) {
@@ -205,7 +210,7 @@ public:
     void copyComponent(const Entity prefab, Entity dest) override {
         auto cmpOpt = tryGetData(prefab);
         if (cmpOpt) {
-            addData(dest, *cmpOpt);
+            addData(dest, std::move(*cmpOpt));
         }
     }
 
@@ -261,18 +266,18 @@ public:
     }
 
     template <typename T>
-    void addComponent(const Entity entity, T component) {
+    void addComponent(const Entity entity, T&& component) {
         long index = getIndex<T>();
         if (index == -1) {
             registerComponent<T>();
             index = mComponentArrays.size() - 1;
         }
-        getComponentArray<T>(index)->addData(entity, component);
+        getComponentArray<T>(index)->addData(entity, std::move(component));
     }
 
     template <typename T>
-    void setComponent(const Entity entity, T component) {
-        getComponentArray<T>(getIndex<T>())->setData(entity, component);
+    void setComponent(const Entity entity, T&& component) {
+        getComponentArray<T>(getIndex<T>())->setData(entity, std::move(component));
     }
 
     template <typename T>
@@ -697,7 +702,7 @@ private:
 template <typename T>
 Entity Entity::add(T component) {
     const World& world = World::getInstance();
-    world.mComponentManager->addComponent(*this, component);
+    world.mComponentManager->addComponent(*this, std::move(component));
     Pattern pattern = world.mEntityManager->getPattern(*this);
     pattern.set(ComponentManager::getComponentID<T>(), true);
     world.mEntityManager->setPattern(*this, pattern);
@@ -707,6 +712,19 @@ Entity Entity::add(T component) {
     return *this;
 }
 
+// template <typename T>
+// Entity Entity::add(T&& component) {
+//     const World& world = World::getInstance();
+//     world.mComponentManager->addComponent(*this, component);
+//     Pattern pattern = world.mEntityManager->getPattern(*this);
+//     pattern.set(ComponentManager::getComponentID<T>(), true);
+//     world.mEntityManager->setPattern(*this, pattern);
+//     if (world.isActive(*this)) {
+//         world.mSystemManager->onEntityPatternChanged(*this, pattern);
+//     }
+//     return *this;
+// }
+
 template <typename T>
 Entity Entity::add() {
     add(T());
@@ -715,7 +733,7 @@ Entity Entity::add() {
 
 template <typename T>
 Entity Entity::set(T component) const {
-    World::getInstance().mComponentManager->setComponent(*this, component);
+    World::getInstance().mComponentManager->setComponent(*this, std::move(component));
     return *this;
 }
 
