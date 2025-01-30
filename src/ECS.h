@@ -5,7 +5,6 @@
 #include <cassert>
 #include <concepts>
 #include <mutex>
-#include <optional>
 #include <queue>
 #include <type_traits>
 #include <unordered_map>
@@ -75,7 +74,7 @@ public:
     Entity remove();
 
     template <typename T>
-    std::optional<T> tryGet() const;
+    T* tryGet() const;
 
     template <typename T>
     T& get() const;
@@ -186,12 +185,12 @@ public:
 
     bool hasData(const Entity entity) const { return mEntityToIndex[entity.id()] != -1; }
 
-    std::optional<T> tryGetData(const Entity entity) {
+    T* tryGetData(const Entity entity) {
         if (!hasData(entity)) {
-            return std::nullopt;
+            return nullptr;
         }
         const u32 ix = mEntityToIndex.at(entity.id());
-        return mComponentTable.at(ix);
+        return &mComponentTable.at(ix);
     }
 
     T& getData(const Entity entity) {
@@ -208,7 +207,7 @@ public:
     }
 
     void copyComponent(const Entity prefab, Entity dest) override {
-        auto cmpOpt = tryGetData(prefab);
+        T* cmpOpt = tryGetData(prefab);
         if (cmpOpt) {
             addData(dest, std::move(*cmpOpt));
         }
@@ -299,10 +298,10 @@ public:
     }
 
     template <typename T>
-    std::optional<T> tryGetComponent(const Entity entity) const {
+    T* tryGetComponent(const Entity entity) const {
         const long ix = getIndex<T>();
         if (ix == -1) {
-            return std::nullopt;
+            return nullptr;
         }
         return getComponentArray<T>(ix)->tryGetData(entity);
     }
@@ -752,7 +751,7 @@ Entity Entity::remove() {
 }
 
 template <typename T>
-std::optional<T> Entity::tryGet() const {
+T* Entity::tryGet() const {
     return World::getInstance().mComponentManager->tryGetComponent<T>(*this);
 }
 
