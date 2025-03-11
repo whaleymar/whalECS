@@ -79,6 +79,10 @@ public:
     template <typename T>
     T& get() const;
 
+    // returns a pointer to the component of type T in the entity or any of its children. Searches in a DFS manner.
+    template <typename T>
+    T* getInChildren(bool includeInactive = false) const;
+
     template <typename T>
     bool has() const;
 
@@ -758,6 +762,24 @@ T* Entity::tryGet() const {
 template <typename T>
 T& Entity::get() const {
     return World::getInstance().mComponentManager->getComponent<T>(*this);
+}
+
+template <typename T>
+T* Entity::getInChildren(bool includeInactive) const {
+    const World& world = World::getInstance();
+    T* cmp = world.mComponentManager->tryGetComponent<T>(*this);
+    if (cmp) {
+        return cmp;
+    }
+    for (const Entity& child : world.mEntityManager->parentToChildren[*this]) {
+        if (includeInactive || world.mEntityManager->isActive(child)) {
+            cmp = child.getInChildren<T>(includeInactive);
+            if (cmp) {
+                return cmp;
+            }
+        }
+    }
+    return nullptr;
 }
 
 template <typename T>
