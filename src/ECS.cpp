@@ -36,6 +36,7 @@ void World::killEntities() {
     while (!mToKill.empty()) {
         // copy mToKill in case onRemove callbacks kill more entities
         auto tmpToKill = std::move(mToKill);
+        mKilledThisFrame.insert(tmpToKill.begin(), tmpToKill.end());
         mToKill.clear();
         for (auto entityToKill : tmpToKill) {
             if (mDeathCallback) {
@@ -53,6 +54,7 @@ void World::killEntities() {
             mToKill.erase(entityToKill);
         }
     }
+    mKilledThisFrame.clear();
 }
 
 Entity World::copy(Entity prefab, bool isActive) const {

@@ -92,6 +92,7 @@ public:
     void deactivate() const;
     void kill() const;
     bool isValid() const;
+    bool isKilledThisFrame() const;
 
     void addChild(Entity child) const;
     Entity createChild(bool isActive = true) const;
@@ -695,6 +696,7 @@ private:
     ComponentManager* mComponentManager;
     SystemManager* mSystemManager;
     std::unordered_set<Entity, EntityHash> mToKill;
+    std::unordered_set<Entity, EntityHash> mKilledThisFrame;
     EntityCallback mDeathCallback = nullptr;
     EntityCallback mCreateCallback = nullptr;
     EntityPairCallback mChildCreateCallback = nullptr;

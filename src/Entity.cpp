@@ -24,6 +24,11 @@ bool Entity::isValid() const {
     return mId != 0;
 }
 
+bool Entity::isKilledThisFrame() const {
+    World& world = World::getInstance();
+    return world.mToKill.contains(*this) || world.mKilledThisFrame.contains(*this);
+}
+
 void Entity::addChild(ecs::Entity child) const {
     const World& world = World::getInstance();
     Entity oldParent = world.mEntityManager->childToParent[child];
