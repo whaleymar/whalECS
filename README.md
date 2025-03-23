@@ -23,8 +23,6 @@ The main changes are:
     - will drastically reduce memory usage of tags -- currently using MAX_ENTITIES bytes per tag (so 5kb w/ defaults), this would reduce it to 1 bit
 - thread-safe system methods
 - parallelization
-- queue add/remove operations until end of frame? so i'm only iterating through the system stuff once. also avoids accidental mutation during update loops
-    - con: cannot immediately access components added that frame
 - store components in std::vector for "unlimited" growth? Would also prevent allocating MAXENTITIES # of structs for low-use components
     - would require changes to:
         - ComponentArray.add: push_back
@@ -32,4 +30,7 @@ The main changes are:
         - EntityManager::mPatterns: would be a vector & would need slightly more management (id->ix map or something)
         - EntityManager::mActiveEntities: is a bitset, would need to convert to a std::vector<bool>
 
-- *considering* having tryGetComponent return a pointer instead of an `Optional<T>` so that manipulating the queried value is easier, rather than needing to call .set
+### Considering:
+- queue add/remove operations until end of frame? so i'm only iterating through the system stuff once. also avoids accidental mutation during update loops
+    - con: cannot immediately access components added that frame
+

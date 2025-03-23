@@ -1,17 +1,22 @@
 #pragma once
 
 #include <array>
-#include <bitset>
 #include <cassert>
 #include <concepts>
-#include <mutex>
-#include <queue>
+#include <cstdint>
 #include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
+#include "DynamicBitset.h"
 #include "Traits.h"
+
+// REFACTOR GOALS
+// 2) reduce memory cost of tag components
+// 3) unregister components which are assigned to 0 entities
+// 4) add singleton entities
+// 5) make entity names first-class components
 
 typedef uint16_t u16;
 typedef uint32_t u32;
@@ -37,10 +42,11 @@ class SystemManager;
 
 using EntityID = u32;
 using ComponentType = u16;
-using Pattern = std::bitset<MAX_COMPONENTS>;
+using Pattern = DynamicBitset;
 using SystemId = u16;
 
 class Entity;
+class World;
 struct EntityHash;
 using EntityCallback = void (*)(Entity);
 using EntityPairCallback = void (*)(Entity, Entity);
@@ -58,19 +64,28 @@ public:
     bool operator<(Entity other) const { return mId < other.mId; }
 
     template <typename T>
+        requires(!std::is_empty_v<T>)
     Entity add(T component);
 
-    // template <typename T>
-    // Entity add(T&& component);
+    template <typename T>
+        requires(!std::is_empty_v<T>)
+    Entity add();
 
     template <typename T>
+        requires(std::is_empty_v<T>)
     Entity add();
 
     // set value of component that's been added
     template <typename T>
+        requires(!std::is_empty_v<T>)
     Entity set(T component) const;
 
     template <typename T>
+        requires(!std::is_empty_v<T>)
+    Entity remove();
+
+    template <typename T>
+        requires(std::is_empty_v<T>)
     Entity remove();
 
     template <typename T>
@@ -84,6 +99,11 @@ public:
     T* getInChildren(bool includeInactive = false) const;
 
     template <typename T>
+        requires(!std::is_empty_v<T>)
+    bool has() const;
+
+    template <typename T>
+        requires(std::is_empty_v<T>)
     bool has() const;
 
     Entity copy(bool isActive = true) const;
@@ -106,6 +126,13 @@ public:
 
 private:
     EntityID mId = 0;
+
+    void removeFromMgr(const World& world, ComponentType t);
+    void removeTagFromMgr(const World& world, ComponentType t);
+    void addToMgr(const World& world, ComponentType t);
+    void addTagToMgr(const World& world, ComponentType t);
+    bool _has(ComponentType t) const;
+    bool _hasTag(ComponentType t) const;
 };
 
 // utility class. Uses RAII to defer an entity's activation until it goes out of scope
@@ -225,31 +252,11 @@ private:
     u32 mSize = 0;
 };
 
-class EntityManager {
+class IEntityManager {
 public:
-    EntityManager();
-
-    Entity createEntity(bool isAlive, Entity parent);
-    void destroyEntity(Entity entity);
-    void setPattern(Entity entity, const Pattern& pattern);
-    Pattern getPattern(Entity entity) const;
-    u32 getEntityCount() const { return mEntityCount; }
-    u32 getActiveEntityCount() const;
-    bool isActive(Entity entity) const;
-
-    // returns true if entity was activated, false if it was already active
-    bool activate(Entity entity);
-    bool deactivate(Entity entity);
-
-    std::unordered_map<Entity, Entity, EntityHash> childToParent;
-    std::unordered_map<Entity, std::unordered_set<Entity, EntityHash>, EntityHash> parentToChildren;
-
-private:
-    std::queue<EntityID> mAvailableIDs;
-    std::array<Pattern, MAX_ENTITIES> mPatterns;
-    std::bitset<MAX_ENTITIES> mActiveEntities;
-    std::mutex mCreatorMutex;
-    u32 mEntityCount = 0;
+    virtual ~IEntityManager() = default;
+    virtual const std::unordered_set<Entity, EntityHash>& getChildren(Entity e) = 0;
+    virtual bool isActive(Entity e) const = 0;
 };
 
 template <typename T>
@@ -322,6 +329,7 @@ public:
     // assign unique IDs to each component type
     static inline ComponentType ComponentID = 0;
     template <typename T>
+    // requires(!is_base_of_template<Exclude, T>::value && !std::is_empty_v<T>)
         requires(!is_base_of_template<Exclude, T>::value)
     static inline ComponentType getComponentID() {
         static ComponentType id = ComponentID++;
@@ -329,8 +337,25 @@ public:
     }
 
     template <typename T>
+    // requires(is_base_of_template<Exclude, T>::value && !std::is_empty_v<T>)
         requires(is_base_of_template<Exclude, T>::value)
     static inline ComponentType getComponentID() {
+        return T::COMPONENT_TYPE;
+    }
+
+    // use a separate ID for tags
+    static inline ComponentType TagComponentID = 0;
+    template <typename T>
+    // requires(!is_base_of_template<Exclude, T>::value && std::is_empty_v<T>)
+        requires(!is_base_of_template<Exclude, T>::value)
+    static inline ComponentType getTagID() {
+        static ComponentType id = TagComponentID++;
+        return id;
+    }
+
+    template <typename T>
+        requires(is_base_of_template<Exclude, T>::value)
+    static inline ComponentType getTagID() {
         return T::COMPONENT_TYPE;
     }
 
@@ -365,7 +390,7 @@ public:
     virtual ~SystemBase() = default;
 
     virtual std::unordered_map<EntityID, Entity>& getEntitiesVirtual() = 0;  // only used by SystemManager
-    virtual bool isPatternInSystem(Pattern pattern) = 0;
+    virtual bool isPatternInSystem(const Pattern& pattern, const Pattern& tagPattern) = 0;
 };
 
 // might combine these two? not sure who would use it
@@ -426,15 +451,11 @@ template <typename... T>
 class ISystem : public SystemBase {
 public:
     ISystem() {
-        std::vector<ComponentType> componentTypes;
-        std::vector<ComponentType> antiComponentTypes;
-        InitializeIDs<T...>(componentTypes, antiComponentTypes);
-        for (auto const& componentType : componentTypes) {
-            mPattern.set(componentType);
-        }
-        for (auto const& componentType : antiComponentTypes) {
-            mAntiPattern.set(componentType);
-        }
+        mPattern.resize(MAX_COMPONENTS);
+        mAntiPattern.resize(MAX_COMPONENTS);
+        mTagPattern.resize(MAX_COMPONENTS);
+        mTagAntiPattern.resize(MAX_COMPONENTS);
+        InitializeIDs<T...>();
     }
 
     std::unordered_map<EntityID, Entity>& getEntitiesVirtual() override { return mEntities; }
@@ -442,34 +463,54 @@ public:
     static std::unordered_map<EntityID, Entity> getEntitiesCopy() { return mEntities; }
     static const std::unordered_map<EntityID, Entity>& getEntities() { return mEntities; }
     static Entity first() { return mEntities.begin()->second; }
-    Pattern getPattern() { return mPattern; }
-    bool isPatternInSystem(Pattern pattern) override { return (pattern & mPattern) == mPattern && (pattern & mAntiPattern) == 0; }
+    bool isPatternInSystem(const Pattern& pattern, const Pattern& tagPattern) override {
+        return (pattern & mPattern) == mPattern && (pattern & mAntiPattern).all_zero() && (tagPattern & mTagPattern) == mTagPattern &&
+               (tagPattern & mTagAntiPattern).all_zero();
+    }
 
 private:
     // need a First and Second, otherwise there is ambiguity when there's only one
     // element (InitializeIDs<type> vs InitializeIDs<type, <>>)
     template <typename First, typename Second, typename... Rest>
-    static void InitializeIDs(std::vector<ComponentType>& componentTypes, std::vector<ComponentType>& antiComponentTypes) {
-        if (is_base_of_template<Exclude, First>::value) {
-            antiComponentTypes.push_back(ComponentManager::getComponentID<First>());
+    void InitializeIDs() {
+        if constexpr (is_base_of_template<Exclude, First>::value) {
+            if constexpr (std::is_empty_v<First>) {
+                mTagAntiPattern.set(ComponentManager::getTagID<First>());
+            } else {
+                mAntiPattern.set(ComponentManager::getComponentID<First>());
+            }
         } else {
-            componentTypes.push_back(ComponentManager::getComponentID<First>());
+            if constexpr (std::is_empty_v<First>) {
+                mTagPattern.set(ComponentManager::getTagID<First>());
+            } else {
+                mPattern.set(ComponentManager::getComponentID<First>());
+            }
         }
-        InitializeIDs<Second, Rest...>(componentTypes, antiComponentTypes);
+        InitializeIDs<Second, Rest...>();
     }
 
     template <typename Last>
-    static void InitializeIDs(std::vector<ComponentType>& componentTypes, std::vector<ComponentType>& antiComponentTypes) {
-        if (is_base_of_template<Exclude, Last>::value) {
-            antiComponentTypes.push_back(ComponentManager::getComponentID<Last>());
+    void InitializeIDs() {
+        if constexpr (is_base_of_template<Exclude, Last>::value) {
+            if constexpr (std::is_empty_v<Last>) {
+                mTagAntiPattern.set(ComponentManager::getTagID<Last>());
+            } else {
+                mAntiPattern.set(ComponentManager::getComponentID<Last>());
+            }
         } else {
-            componentTypes.push_back(ComponentManager::getComponentID<Last>());
+            if constexpr (std::is_empty_v<Last>) {
+                mTagPattern.set(ComponentManager::getTagID<Last>());
+            } else {
+                mPattern.set(ComponentManager::getComponentID<Last>());
+            }
         }
     }
 
     inline static std::unordered_map<EntityID, Entity> mEntities = {};
     Pattern mPattern;
     Pattern mAntiPattern;
+    Pattern mTagPattern;
+    Pattern mTagAntiPattern;
 };
 
 // i fucking love concepts
@@ -593,7 +634,7 @@ public:
     void clear();
     void autoUpdate();
     void onEntityDestroyed(const Entity entity) const;
-    void onEntityPatternChanged(const Entity entity, const Pattern& newEntityPattern) const;
+    void onEntityPatternChanged(const Entity entity, const Pattern& newEntityPattern, const Pattern& newEntityTagPattern) const;
     void onPaused();
     void onUnpaused();
 
@@ -692,7 +733,7 @@ private:
     // is private because it's a bad idea to use this in game logic. An entity's ID could be recycled at any time
     bool isActive(Entity entity) const;
 
-    EntityManager* mEntityManager;
+    IEntityManager* mEntityManager;
     ComponentManager* mComponentManager;
     SystemManager* mSystemManager;
     std::unordered_set<Entity, EntityHash> mToKill;
@@ -705,54 +746,49 @@ private:
 };
 
 template <typename T>
+    requires(!std::is_empty_v<T>)
 Entity Entity::add(T component) {
     const World& world = World::getInstance();
     world.mComponentManager->addComponent(*this, std::move(component));
-    Pattern pattern = world.mEntityManager->getPattern(*this);
-    pattern.set(ComponentManager::getComponentID<T>(), true);
-    world.mEntityManager->setPattern(*this, pattern);
-    if (world.isActive(*this)) {
-        world.mSystemManager->onEntityPatternChanged(*this, pattern);
-    }
+    addToMgr(world, ComponentManager::getComponentID<T>());
     return *this;
 }
 
-// template <typename T>
-// Entity Entity::add(T&& component) {
-//     const World& world = World::getInstance();
-//     world.mComponentManager->addComponent(*this, component);
-//     Pattern pattern = world.mEntityManager->getPattern(*this);
-//     pattern.set(ComponentManager::getComponentID<T>(), true);
-//     world.mEntityManager->setPattern(*this, pattern);
-//     if (world.isActive(*this)) {
-//         world.mSystemManager->onEntityPatternChanged(*this, pattern);
-//     }
-//     return *this;
-// }
-
 template <typename T>
+    requires(!std::is_empty_v<T>)
 Entity Entity::add() {
     add(T());
     return *this;
 }
 
 template <typename T>
+    requires(std::is_empty_v<T>)
+Entity Entity::add() {
+    const World& world = World::getInstance();
+    addTagToMgr(world, ComponentManager::getTagID<T>());
+    return *this;
+}
+
+template <typename T>
+    requires(!std::is_empty_v<T>)
 Entity Entity::set(T component) const {
     World::getInstance().mComponentManager->setComponent(*this, std::move(component));
     return *this;
 }
 
 template <typename T>
+    requires(!std::is_empty_v<T>)
 Entity Entity::remove() {
-    // World::getInstance().removeComponent<T>(*this);
     const World& world = World::getInstance();
-    Pattern pattern = world.mEntityManager->getPattern(*this);
-    pattern.set(ComponentManager::getComponentID<T>(), false);
-    world.mEntityManager->setPattern(*this, pattern);
-    if (world.isActive(*this)) {
-        world.mSystemManager->onEntityPatternChanged(*this, pattern);  // should always go before removeComponent so we can run onRemove method
-    }
+    removeFromMgr(world, ComponentManager::getComponentID<T>());  // should always go before removeComponent so we can run onRemove method
     world.mComponentManager->removeComponent<T>(*this);
+    return *this;
+}
+
+template <typename T>
+    requires(std::is_empty_v<T>)
+Entity Entity::remove() {
+    removeTagFromMgr(World::getInstance(), ComponentManager::getTagID<T>());
     return *this;
 }
 
@@ -773,7 +809,7 @@ T* Entity::getInChildren(bool includeInactive) const {
     if (cmp) {
         return cmp;
     }
-    for (const Entity& child : world.mEntityManager->parentToChildren[*this]) {
+    for (const Entity& child : world.mEntityManager->getChildren(*this)) {
         if (includeInactive || world.mEntityManager->isActive(child)) {
             cmp = child.getInChildren<T>(includeInactive);
             if (cmp) {
@@ -785,19 +821,26 @@ T* Entity::getInChildren(bool includeInactive) const {
 }
 
 template <typename T>
+    requires(!std::is_empty_v<T>)
 bool Entity::has() const {
-    return World::getInstance().mEntityManager->getPattern(*this).test(ComponentManager::getComponentID<T>());
+    return _has(ComponentManager::getComponentID<T>());
+}
+
+template <typename T>
+    requires(std::is_empty_v<T>)
+bool Entity::has() const {
+    return _hasTag(ComponentManager::getTagID<T>());
 }
 
 template <typename... T>
 void Entity::forChild(void(callback)(ecs::Entity, T...), bool isRecursive, T... args) const {
     if (isRecursive) {
-        for (const Entity& child : World::getInstance().mEntityManager->parentToChildren[*this]) {
+        for (const Entity& child : World::getInstance().mEntityManager->getChildren(*this)) {
             callback(child, args...);
             child.forChild(callback, true, args...);
         }
     } else {
-        for (const Entity& child : World::getInstance().mEntityManager->parentToChildren[*this]) {
+        for (const Entity& child : World::getInstance().mEntityManager->getChildren(*this)) {
             callback(child, args...);
         }
     }

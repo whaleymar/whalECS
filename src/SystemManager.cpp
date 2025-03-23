@@ -49,11 +49,11 @@ void SystemManager::onEntityDestroyed(const Entity entity) const {
     }
 }
 
-void SystemManager::onEntityPatternChanged(const Entity entity, const Pattern& newEntityPattern) const {
+void SystemManager::onEntityPatternChanged(const Entity entity, const Pattern& newEntityPattern, const Pattern& newTagPattern) const {
     // TODO make thread safe
     for (size_t i = 0; i < mSystems.size(); i++) {
         auto const ix = mSystems[i]->getEntitiesVirtual().find(entity.id());
-        if (mSystems[i]->isPatternInSystem(newEntityPattern)) {
+        if (mSystems[i]->isPatternInSystem(newEntityPattern, newTagPattern)) {
             if (ix != mSystems[i]->getEntitiesVirtual().end()) {
                 // already in system
                 continue;

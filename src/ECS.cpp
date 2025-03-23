@@ -1,5 +1,7 @@
 #include "ECS.h"
 
+#include "EntityManager.h"
+
 namespace whal::ecs {
 
 World::World() : mEntityManager(new EntityManager), mComponentManager(new ComponentManager), mSystemManager(new SystemManager) {}
@@ -15,7 +17,7 @@ u32 World::getComponentCount() const {
 }
 
 Entity World::entity(bool isActive) const {
-    Entity e = mEntityManager->createEntity(isActive, mRootEntity);
+    Entity e = static_cast<EntityManager*>(mEntityManager)->createEntity(isActive, mRootEntity);
     if (e.isValid() && mCreateCallback) {
         mCreateCallback(e);
     }
@@ -27,7 +29,7 @@ void World::kill(Entity entity) {
     mToKill.insert(entity);
 
     // recursively kill child entities
-    for (Entity child : mEntityManager->parentToChildren[entity]) {
+    for (Entity child : static_cast<EntityManager*>(mEntityManager)->parentToChildren[entity]) {
         kill(child);
     }
 }
@@ -45,7 +47,7 @@ void World::killEntities() {
             mSystemManager->onEntityDestroyed(entityToKill);  // this goes first so onRemove can fetch components before
                                                               // they're deallocated
             unparent(entityToKill);
-            mEntityManager->destroyEntity(entityToKill);
+            static_cast<EntityManager*>(mEntityManager)->destroyEntity(entityToKill);
             mComponentManager->entityDestroyed(entityToKill);
         }
 
@@ -63,11 +65,12 @@ Entity World::copy(Entity prefab, bool isActive) const {
         return newEntity;
     }
     mComponentManager->copyComponents(prefab, newEntity);
-    mEntityManager->setPattern(newEntity, mEntityManager->getPattern(prefab));
+    EntityManager* pEM = static_cast<EntityManager*>(mEntityManager);
+    pEM->setPattern(newEntity, pEM->getPattern(prefab));
 
     // copy prefab's parent
-    mEntityManager->childToParent[newEntity] = mEntityManager->childToParent[prefab];
-    mEntityManager->parentToChildren[mEntityManager->childToParent[newEntity]].insert(newEntity);
+    pEM->childToParent[newEntity] = pEM->childToParent[prefab];
+    pEM->parentToChildren[pEM->childToParent[newEntity]].insert(newEntity);
 
     if (isActive) {
         newEntity.activate();
@@ -77,35 +80,35 @@ Entity World::copy(Entity prefab, bool isActive) const {
 }
 
 void World::activate(Entity entity) const {
-    if (mEntityManager->activate(entity)) {
-        auto pattern = mEntityManager->getPattern(entity);
-        mSystemManager->onEntityPatternChanged(entity, pattern);
+    EntityManager* pEM = static_cast<EntityManager*>(mEntityManager);
+    if (pEM->activate(entity)) {
+        mSystemManager->onEntityPatternChanged(entity, pEM->getPattern(entity), pEM->getTagPattern(entity));
     }
 
     // recursively activate children
-    for (Entity child : mEntityManager->parentToChildren[entity]) {
+    for (Entity child : pEM->parentToChildren[entity]) {
         activate(child);
     }
 }
 
 void World::deactivate(Entity entity) const {
     // remove from systems but keep in entity manager and component manager
-    if (mEntityManager->deactivate(entity)) {
+    if (static_cast<EntityManager*>(mEntityManager)->deactivate(entity)) {
         mSystemManager->onEntityDestroyed(entity);
     }
 
     // recursively deactivate children
-    for (Entity child : mEntityManager->parentToChildren[entity]) {
+    for (Entity child : static_cast<EntityManager*>(mEntityManager)->parentToChildren[entity]) {
         deactivate(child);
     }
 }
 
 u32 World::getEntityCount() const {
-    return mEntityManager->getEntityCount();
+    return static_cast<EntityManager*>(mEntityManager)->getEntityCount();
 }
 
 u32 World::getActiveEntityCount() const {
-    return mEntityManager->getActiveEntityCount();
+    return static_cast<EntityManager*>(mEntityManager)->getActiveEntityCount();
 }
 
 void World::setEntityDeathCallback(EntityCallback callback) {
@@ -125,9 +128,10 @@ void World::setEntityAdoptCallback(EntityPairCallback callback) {
 }
 
 void World::unparent(Entity e) const {
-    Entity oldParent = mEntityManager->childToParent[e];
-    mEntityManager->childToParent.erase(e);
-    mEntityManager->parentToChildren[oldParent].erase(e);
+    EntityManager* pEM = static_cast<EntityManager*>(mEntityManager);
+    Entity oldParent = pEM->childToParent[e];
+    pEM->childToParent.erase(e);
+    pEM->parentToChildren[oldParent].erase(e);
 }
 
 bool World::isActive(Entity entity) const {

@@ -1,4 +1,5 @@
 #include "ECS.h"
+#include "EntityManager.h"
 
 namespace whal::ecs {
 
@@ -31,10 +32,11 @@ bool Entity::isKilledThisFrame() const {
 
 void Entity::addChild(ecs::Entity child) const {
     const World& world = World::getInstance();
-    Entity oldParent = world.mEntityManager->childToParent[child];
-    world.mEntityManager->childToParent[child] = *this;
-    world.mEntityManager->parentToChildren[oldParent].erase(child);
-    world.mEntityManager->parentToChildren[*this].insert(child);
+    EntityManager* pEM = static_cast<EntityManager*>(world.mEntityManager);
+    Entity oldParent = pEM->childToParent[child];
+    pEM->childToParent[child] = *this;
+    pEM->parentToChildren[oldParent].erase(child);
+    pEM->parentToChildren[*this].insert(child);
     if (isValid() && child.isValid() && world.mAdoptCallback) {
         world.mAdoptCallback(child, *this);
     }
@@ -42,7 +44,7 @@ void Entity::addChild(ecs::Entity child) const {
 
 ecs::Entity Entity::createChild(bool isActive) const {
     const World& world = World::getInstance();
-    Entity e = world.mEntityManager->createEntity(isActive, *this);
+    Entity e = static_cast<EntityManager*>(world.mEntityManager)->createEntity(isActive, *this);
     if (e.isValid() && world.mChildCreateCallback) {
         world.mChildCreateCallback(e, *this);
     }
@@ -52,26 +54,71 @@ ecs::Entity Entity::createChild(bool isActive) const {
 void Entity::orphan() const {
     // World::getInstance().orphan(*this);
     const World& world = World::getInstance();
-    Entity oldParent = world.mEntityManager->childToParent[*this];
+    EntityManager* pEM = static_cast<EntityManager*>(world.mEntityManager);
+    Entity oldParent = pEM->childToParent[*this];
     if (oldParent == world.mRootEntity) {
         // cannot orphan top-level parent
         return;
     }
 
-    world.mEntityManager->childToParent[*this] = world.mRootEntity;
+    pEM->childToParent[*this] = world.mRootEntity;
 
     // there are no guarantees on which order parents/children are deleted if the deletes happen on the same frame.
     // BUT i don't think I touch a parent's list of children when it dies, so this should be fine?
-    world.mEntityManager->parentToChildren[oldParent].erase(*this);
-    world.mEntityManager->parentToChildren[world.mRootEntity].insert(*this);
+    pEM->parentToChildren[oldParent].erase(*this);
+    pEM->parentToChildren[world.mRootEntity].insert(*this);
 }
 
 Entity Entity::parent() const {
-    return World::getInstance().mEntityManager->childToParent[*this];
+    return static_cast<EntityManager*>(World::getInstance().mEntityManager)->childToParent[*this];
 }
 
 const std::unordered_set<Entity, EntityHash>& Entity::children() const {
-    return World::getInstance().mEntityManager->parentToChildren[*this];
+    return static_cast<EntityManager*>(World::getInstance().mEntityManager)->parentToChildren[*this];
+}
+
+void Entity::removeFromMgr(const World& world, ComponentType t) {
+    EntityManager* pEM = static_cast<EntityManager*>(world.mEntityManager);
+    Pattern& pattern = pEM->getPatternMut(*this);
+    pattern.set(t, false);
+    if (world.isActive(*this)) {
+        world.mSystemManager->onEntityPatternChanged(*this, pattern, pEM->getTagPattern(*this));
+    }
+}
+
+void Entity::removeTagFromMgr(const World& world, ComponentType t) {
+    EntityManager* pEM = static_cast<EntityManager*>(world.mEntityManager);
+    Pattern& pattern = pEM->getTagPatternMut(*this);
+    pattern.set(t, false);
+    if (world.isActive(*this)) {
+        world.mSystemManager->onEntityPatternChanged(*this, pEM->getPattern(*this), pattern);
+    }
+}
+
+void Entity::addToMgr(const World& world, ComponentType t) {
+    EntityManager* pEM = static_cast<EntityManager*>(world.mEntityManager);
+    Pattern& pattern = pEM->getPatternMut(*this);
+    pattern.set(t, true);
+    if (world.isActive(*this)) {
+        world.mSystemManager->onEntityPatternChanged(*this, pattern, pEM->getTagPattern(*this));
+    }
+}
+
+void Entity::addTagToMgr(const World& world, ComponentType t) {
+    EntityManager* pEM = static_cast<EntityManager*>(world.mEntityManager);
+    Pattern& pattern = pEM->getTagPatternMut(*this);
+    pattern.set(t, true);
+    if (world.isActive(*this)) {
+        world.mSystemManager->onEntityPatternChanged(*this, pEM->getPattern(*this), pattern);
+    }
+}
+
+bool Entity::_has(ComponentType t) const {
+    return static_cast<EntityManager*>(World::getInstance().mEntityManager)->getPattern(*this).test(t);
+}
+
+bool Entity::_hasTag(ComponentType t) const {
+    return static_cast<EntityManager*>(World::getInstance().mEntityManager)->getTagPattern(*this).test(t);
 }
 
 }  // namespace whal::ecs

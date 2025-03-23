@@ -1,14 +1,19 @@
+#include "EntityManager.h"
+
 #include <mutex>
 #include "ECS.h"
 
 namespace whal::ecs {
 
-EntityManager::EntityManager() {
+EntityManager::EntityManager() : mActiveEntities(MAX_ENTITIES) {
     // entity ID 0 is reserved as a Dummy ID (in case entity creation fails)
+    mPatterns[0].resize(MAX_COMPONENTS);
+    mTagPatterns[0].resize(MAX_COMPONENTS);
     for (u32 entity = 1; entity < MAX_ENTITIES; entity++) {
         mAvailableIDs.push(entity);
+        mPatterns[entity].resize(MAX_COMPONENTS);
+        mTagPatterns[entity].resize(MAX_COMPONENTS);
     }
-    mActiveEntities.reset();
 }
 
 Entity EntityManager::createEntity(bool isAlive, Entity parent) {
@@ -33,7 +38,8 @@ Entity EntityManager::createEntity(bool isAlive, Entity parent) {
 
 void EntityManager::destroyEntity(Entity entity) {
     mActiveEntities.reset(static_cast<u32>(entity.id()));
-    mPatterns[entity.mId].reset();  // invalidate pattern
+    mPatterns[entity.mId].reset();     // invalidate pattern
+    mTagPatterns[entity.mId].reset();  // invalidate pattern
     mAvailableIDs.push(entity.id());
     mEntityCount--;
 }
@@ -42,8 +48,24 @@ void EntityManager::setPattern(Entity entity, const Pattern& pattern) {
     mPatterns[entity.mId] = pattern;
 }
 
-Pattern EntityManager::getPattern(Entity entity) const {
+const Pattern& EntityManager::getPattern(Entity entity) const {
     return mPatterns[entity.mId];
+}
+
+Pattern& EntityManager::getPatternMut(Entity entity) {
+    return mPatterns[entity.mId];
+}
+
+void EntityManager::setTagPattern(Entity entity, const Pattern& pattern) {
+    mTagPatterns[entity.mId] = pattern;
+}
+
+const Pattern& EntityManager::getTagPattern(Entity entity) const {
+    return mTagPatterns[entity.mId];
+}
+
+Pattern& EntityManager::getTagPatternMut(Entity entity) {
+    return mTagPatterns[entity.mId];
 }
 
 u32 EntityManager::getActiveEntityCount() const {
@@ -68,6 +90,10 @@ bool EntityManager::deactivate(Entity entity) {
     }
     mActiveEntities.reset(static_cast<u32>(entity.id()));
     return true;
+}
+
+const std::unordered_set<Entity, EntityHash>& EntityManager::getChildren(Entity e) {
+    return parentToChildren[e];
 }
 
 }  // namespace whal::ecs
