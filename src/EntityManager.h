@@ -2,6 +2,7 @@
 
 #include <mutex>
 #include <queue>
+#include <string>
 #include "ECS.h"
 
 namespace whal::ecs {
@@ -21,6 +22,9 @@ public:
     u32 getActiveEntityCount() const;
     bool isActive(Entity entity) const override;
 
+    void setEntityName(Entity entity, const char* name);
+    const char* getEntityName(Entity entity);
+
     // returns true if entity was activated, false if it was already active
     bool activate(Entity entity);
     bool deactivate(Entity entity);
@@ -36,6 +40,7 @@ private:
     std::array<Pattern, MAX_ENTITIES> mTagPatterns;
     DynamicBitset mActiveEntities;
     std::mutex mCreatorMutex;
+    std::unordered_map<EntityID, std::string> mEntityNames;
     u32 mEntityCount = 0;
 };
 

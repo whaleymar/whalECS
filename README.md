@@ -19,16 +19,12 @@ The main changes are:
 
 ### Need:
 
-- optimize for empty types (ie tags). there's a std::is_empty_type (or something) i can use to dispatch a different method in ecs::World. If the type is empty i only need to update the bitmask (can use a separate one for tags) and don't need to touch the component manager
-    - will drastically reduce memory usage of tags -- currently using MAX_ENTITIES bytes per tag (so 5kb w/ defaults), this would reduce it to 1 bit
 - thread-safe system methods
 - parallelization
 - store components in std::vector for "unlimited" growth? Would also prevent allocating MAXENTITIES # of structs for low-use components
     - would require changes to:
         - ComponentArray.add: push_back
         - ComponentArray.remove: pop_back
-        - EntityManager::mPatterns: would be a vector & would need slightly more management (id->ix map or something)
-        - EntityManager::mActiveEntities: is a bitset, would need to convert to a std::vector<bool>
 
 ### Considering:
 - queue add/remove operations until end of frame? so i'm only iterating through the system stuff once. also avoids accidental mutation during update loops

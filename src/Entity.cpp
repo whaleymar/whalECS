@@ -51,6 +51,18 @@ ecs::Entity Entity::createChild(bool isActive) const {
     return e;
 }
 
+ecs::Entity Entity::createChild(const char* name, bool isActive) const {
+    const World& world = World::getInstance();
+    EntityManager* pEM = static_cast<EntityManager*>(world.mEntityManager);
+    Entity e = pEM->createEntity(isActive, *this);
+    pEM->setEntityName(e, name);
+
+    if (e.isValid() && world.mChildCreateCallback) {
+        world.mChildCreateCallback(e, *this);
+    }
+    return e;
+}
+
 void Entity::orphan() const {
     // World::getInstance().orphan(*this);
     const World& world = World::getInstance();
@@ -75,6 +87,14 @@ Entity Entity::parent() const {
 
 const std::unordered_set<Entity, EntityHash>& Entity::children() const {
     return static_cast<EntityManager*>(World::getInstance().mEntityManager)->parentToChildren[*this];
+}
+
+const char* Entity::name() const {
+    return static_cast<EntityManager*>(World::getInstance().mEntityManager)->getEntityName(*this);
+}
+
+void Entity::setName(const char* name) const {
+    static_cast<EntityManager*>(World::getInstance().mEntityManager)->setEntityName(*this, name);
 }
 
 void Entity::removeFromMgr(const World& world, ComponentType t) {

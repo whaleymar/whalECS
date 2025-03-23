@@ -76,6 +76,21 @@ bool EntityManager::isActive(Entity entity) const {
     return mActiveEntities.test(static_cast<u32>(entity.id()));
 }
 
+void EntityManager::setEntityName(Entity entity, const char* name) {
+    mEntityNames[entity.id()] = name;
+}
+
+const char* EntityManager::getEntityName(Entity entity) {
+    auto it = mEntityNames.find(entity.id());
+    if (it != mEntityNames.end()) {
+        return it->second.c_str();
+    }
+
+    // create a name on the fly
+    mEntityNames[entity.id()] = std::string("entity ") + std::to_string(entity.id());
+    return mEntityNames[entity.id()].c_str();
+}
+
 bool EntityManager::activate(Entity entity) {
     if (isActive(entity)) {
         return false;

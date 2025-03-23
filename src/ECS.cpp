@@ -17,7 +17,18 @@ u32 World::getComponentCount() const {
 }
 
 Entity World::entity(bool isActive) const {
-    Entity e = static_cast<EntityManager*>(mEntityManager)->createEntity(isActive, mRootEntity);
+    EntityManager* pEM = static_cast<EntityManager*>(mEntityManager);
+    Entity e = pEM->createEntity(isActive, mRootEntity);
+    if (e.isValid() && mCreateCallback) {
+        mCreateCallback(e);
+    }
+    return e;
+}
+
+Entity World::entity(const char* name, bool isActive) const {
+    EntityManager* pEM = static_cast<EntityManager*>(mEntityManager);
+    Entity e = pEM->createEntity(isActive, mRootEntity);
+    pEM->setEntityName(e, name);
     if (e.isValid() && mCreateCallback) {
         mCreateCallback(e);
     }

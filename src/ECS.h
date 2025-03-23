@@ -15,7 +15,6 @@
 // REFACTOR GOALS
 // 3) unregister components which are assigned to 0 entities
 // 4) add singleton entities
-// 5) make entity names first-class components
 
 typedef uint16_t u16;
 typedef uint32_t u32;
@@ -115,6 +114,7 @@ public:
 
     void addChild(Entity child) const;
     Entity createChild(bool isActive = true) const;
+    Entity createChild(const char* name, bool isActive = true) const;
     void orphan() const;  // makes mRootEntity the parent of `e`
 
     template <typename... T>
@@ -122,6 +122,8 @@ public:
 
     Entity parent() const;                                           // parent getter
     const std::unordered_set<Entity, EntityHash>& children() const;  // children getter
+    const char* name() const;
+    void setName(const char* name) const;
 
 private:
     EntityID mId = 0;
@@ -251,6 +253,7 @@ private:
     u32 mSize = 0;
 };
 
+// I am doing a tiny interface for EntityManager so I don't have to include the whole class in this header
 class IEntityManager {
 public:
     virtual ~IEntityManager() = default;
@@ -674,6 +677,7 @@ public:
 
     // ENTITY
     Entity entity(bool isActive = true) const;
+    Entity entity(const char* name, bool isActive = true) const;
     void kill(Entity entity);
     void killEntities();  // called by update. Should only be called manually in specific circumstances like scene loading
 
