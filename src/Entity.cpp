@@ -31,6 +31,7 @@ bool Entity::isKilledThisFrame() const {
 }
 
 void Entity::addChild(ecs::Entity child) const {
+    assert(!child.has<internal::Component>() && "Cannot re-parent a Component entity");
     const World& world = World::getInstance();
     EntityManager* pEM = static_cast<EntityManager*>(world.mEntityManager);
     Entity oldParent = pEM->childToParent[child];
@@ -94,6 +95,10 @@ const char* Entity::name() const {
 }
 
 void Entity::setName(const char* name) const {
+    static_cast<EntityManager*>(World::getInstance().mEntityManager)->setEntityName(*this, name);
+}
+
+void Entity::setName(std::string_view name) const {
     static_cast<EntityManager*>(World::getInstance().mEntityManager)->setEntityName(*this, name);
 }
 

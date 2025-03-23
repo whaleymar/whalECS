@@ -11,10 +11,10 @@
 
 #include "DynamicBitset.h"
 #include "Traits.h"
+#include "TypeName.h"
 
 // REFACTOR GOALS
 // 3) unregister components which are assigned to 0 entities
-// 4) add singleton entities
 
 typedef uint16_t u16;
 typedef uint32_t u32;
@@ -48,6 +48,12 @@ class World;
 struct EntityHash;
 using EntityCallback = void (*)(Entity);
 using EntityPairCallback = void (*)(Entity, Entity);
+
+namespace internal {
+
+struct Component {};  // marks an entity as a Component
+
+}  // namespace internal
 
 class Entity {
 public:
@@ -124,6 +130,7 @@ public:
     const std::unordered_set<Entity, EntityHash>& children() const;  // children getter
     const char* name() const;
     void setName(const char* name) const;
+    void setName(std::string_view name) const;
 
 private:
     EntityID mId = 0;
@@ -265,18 +272,14 @@ template <typename T>
 class Exclude;
 
 class ComponentManager {
+    friend World;
+
 public:
     ComponentManager();
     ~ComponentManager();
 
     template <typename T>
-    void registerComponent() {
-        const ComponentType type = getComponentID<T>();
-        assert(type < MAX_COMPONENTS && "Registered more than MAX_COMPONENTS components");
-        assert(getIndex<T>() == -1 && "Component type already registered");
-        mComponentToIndex[type] = mComponentArrays.size();
-        mComponentArrays.push_back(new ComponentArray<T>());
-    }
+    void registerComponent();
 
     template <typename T>
     void addComponent(const Entity entity, T&& component) {
@@ -359,6 +362,11 @@ public:
 
     u32 getRegisteredCount() const { return mComponentArrays.size(); }
 
+    template <typename T>
+    Entity getComponentEntity() {
+        return mComponentEntities[getComponentID<T>()];
+    }
+
 private:
     template <typename T>
     ComponentArray<T>* getComponentArray(int ix) const {
@@ -372,6 +380,7 @@ private:
     }
 
     std::array<long, MAX_COMPONENTS> mComponentToIndex;
+    std::array<Entity, MAX_COMPONENTS> mComponentEntities;
     std::vector<IComponentArray*> mComponentArrays;
 };
 
@@ -665,6 +674,7 @@ private:
 
 class World {
     friend Entity;
+    friend ComponentManager;
 
 public:
     inline static World& getInstance() {
@@ -674,6 +684,63 @@ public:
 
     // COMPONENT
     u32 getComponentCount() const;
+
+    // registers a component (if not done already) and returns the associated entity.
+    template <typename T>
+    Entity component() const {
+        if (mComponentManager->getIndex<T>() == -1) {
+            // component not registered
+            mComponentManager->registerComponent<T>();
+        }
+        return mComponentManager->getComponentEntity<T>();
+    }
+
+    // SINGLETON COMPONENTS
+
+    // Singleton components basically store their component in the corresponding component entity.
+    // The component needs to be added manually. Components aren't singletons by default.
+    // Tags cannot be singletons
+    template <typename T>
+        requires(!std::is_empty_v<T>)
+    T& get() const {
+        Entity e = mComponentManager->getComponentEntity<T>();
+        return e.get<T>();
+    }
+
+    template <typename T>
+        requires(!std::is_empty_v<T>)
+    void add() const {
+        Entity e = component<T>();
+        e.add<T>();
+    }
+
+    template <typename T>
+        requires(!std::is_empty_v<T>)
+    void add(T data) const {
+        Entity e = component<T>();
+        e.add<T>(std::move(data));
+    }
+
+    template <typename T>
+        requires(!std::is_empty_v<T>)
+    void set(T component) const {
+        Entity e = mComponentManager->getComponentEntity<T>();
+        e.set<T>(std::move(component));
+    }
+
+    template <typename T>
+        requires(!std::is_empty_v<T>)
+    void remove() const {
+        Entity e = mComponentManager->getComponentEntity<T>();
+        e.remove<T>();
+    }
+
+    template <typename T>
+        requires(!std::is_empty_v<T>)
+    bool has() const {
+        Entity e = mComponentManager->getComponentEntity<T>();
+        return e.has<T>();
+    }
 
     // ENTITY
     Entity entity(bool isActive = true) const;
@@ -717,9 +784,7 @@ public:
     }
 
     void pause() const { mSystemManager->onPaused(); }
-
     void unpause() const { mSystemManager->onUnpaused(); }
-
     void clear();
 
 private:
@@ -731,6 +796,9 @@ private:
 
     // is private because it's a bad idea to use this in game logic. An entity's ID could be recycled at any time
     bool isActive(Entity entity) const;
+
+    // creates an entity for the component. Does *not* emit a creation callback. Entity is also not alive.
+    Entity componentEntity(ComponentType type);
 
     IEntityManager* mEntityManager;
     ComponentManager* mComponentManager;
@@ -843,6 +911,20 @@ void Entity::forChild(void(callback)(ecs::Entity, T...), bool isRecursive, T... 
             callback(child, args...);
         }
     }
+}
+
+template <typename T>
+void ComponentManager::registerComponent() {
+    const ComponentType type = getComponentID<T>();
+    assert(type < MAX_COMPONENTS && "Registered more than MAX_COMPONENTS components");
+    assert(getIndex<T>() == -1 && "Component type already registered");
+    mComponentToIndex[type] = mComponentArrays.size();
+    mComponentArrays.push_back(new ComponentArray<T>());
+
+    // not passing name here because I need to include string to parse the string_view and I'd rather do that in a source file.
+    Entity e = World::getInstance().componentEntity(type);
+    e.setName(type_of<T>());
+    mComponentEntities[type] = e;
 }
 
 }  // namespace whal::ecs

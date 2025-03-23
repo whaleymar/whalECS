@@ -35,8 +35,17 @@ Entity World::entity(const char* name, bool isActive) const {
     return e;
 }
 
+Entity World::componentEntity(ComponentType type) {
+    EntityManager* pEM = static_cast<EntityManager*>(mEntityManager);
+    Entity e = pEM->createEntity(false, mRootEntity);
+    e.add<internal::Component>();
+    return e;
+}
+
 // works for inactive entities too, trust me
 void World::kill(Entity entity) {
+    assert(!entity.has<internal::Component>() &&
+           "Killing Component Entities not implemented (maybe one day this will unregister the Component and remove it from all entities idk)");
     mToKill.insert(entity);
 
     // recursively kill child entities
@@ -91,6 +100,8 @@ Entity World::copy(Entity prefab, bool isActive) const {
 }
 
 void World::activate(Entity entity) const {
+    // I'll allow it
+    // assert(!entity.has<internal::Component>() && "Cannot activate a Component Entity");
     EntityManager* pEM = static_cast<EntityManager*>(mEntityManager);
     if (pEM->activate(entity)) {
         mSystemManager->onEntityPatternChanged(entity, pEM->getPattern(entity), pEM->getTagPattern(entity));

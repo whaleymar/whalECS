@@ -80,6 +80,10 @@ void EntityManager::setEntityName(Entity entity, const char* name) {
     mEntityNames[entity.id()] = name;
 }
 
+void EntityManager::setEntityName(Entity entity, std::string_view name) {
+    mEntityNames[entity.id()] = std::string(name);
+}
+
 const char* EntityManager::getEntityName(Entity entity) {
     auto it = mEntityNames.find(entity.id());
     if (it != mEntityNames.end()) {

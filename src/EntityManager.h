@@ -23,6 +23,7 @@ public:
     bool isActive(Entity entity) const override;
 
     void setEntityName(Entity entity, const char* name);
+    void setEntityName(Entity entity, std::string_view name);
     const char* getEntityName(Entity entity);
 
     // returns true if entity was activated, false if it was already active
