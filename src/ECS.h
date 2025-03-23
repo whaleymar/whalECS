@@ -13,7 +13,6 @@
 #include "Traits.h"
 
 // REFACTOR GOALS
-// 2) reduce memory cost of tag components
 // 3) unregister components which are assigned to 0 entities
 // 4) add singleton entities
 // 5) make entity names first-class components
@@ -346,17 +345,13 @@ public:
     // use a separate ID for tags
     static inline ComponentType TagComponentID = 0;
     template <typename T>
-    // requires(!is_base_of_template<Exclude, T>::value && std::is_empty_v<T>)
-        requires(!is_base_of_template<Exclude, T>::value)
     static inline ComponentType getTagID() {
-        static ComponentType id = TagComponentID++;
-        return id;
-    }
-
-    template <typename T>
-        requires(is_base_of_template<Exclude, T>::value)
-    static inline ComponentType getTagID() {
-        return T::COMPONENT_TYPE;
+        if constexpr (is_base_of_template<Exclude, T>::value) {
+            return T::COMPONENT_TYPE;
+        } else {
+            static ComponentType id = TagComponentID++;
+            return id;
+        }
     }
 
     u32 getRegisteredCount() const { return mComponentArrays.size(); }
@@ -381,7 +376,7 @@ private:
 template <typename T>
 class Exclude {
 public:
-    inline static ComponentType COMPONENT_TYPE = ComponentManager::getComponentID<T>();
+    inline static ComponentType COMPONENT_TYPE = std::is_empty_v<T> ? ComponentManager::getTagID<T>() : ComponentManager::getComponentID<T>();
 };
 
 class SystemBase {
