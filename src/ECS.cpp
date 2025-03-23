@@ -100,8 +100,7 @@ Entity World::copy(Entity prefab, bool isActive) const {
 }
 
 void World::activate(Entity entity) const {
-    // I'll allow it
-    // assert(!entity.has<internal::Component>() && "Cannot activate a Component Entity");
+    assert(!entity.has<internal::Component>() && "Cannot activate a Component Entity");
     EntityManager* pEM = static_cast<EntityManager*>(mEntityManager);
     if (pEM->activate(entity)) {
         mSystemManager->onEntityPatternChanged(entity, pEM->getPattern(entity), pEM->getTagPattern(entity));
