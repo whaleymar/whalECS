@@ -38,7 +38,7 @@ Entity World::entity(const char* name, bool isActive) const {
 Entity World::componentEntity(ComponentType type) {
     EntityManager* pEM = static_cast<EntityManager*>(mEntityManager);
     Entity e = pEM->createEntity(false, mRootEntity);
-    e.add<internal::Component>();
+    // e.add<internal::Component>(); // can't do this here bc it will infinitely recurse when registering the tag
     return e;
 }
 

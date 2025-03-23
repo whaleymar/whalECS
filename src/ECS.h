@@ -13,9 +13,6 @@
 #include "Traits.h"
 #include "TypeName.h"
 
-// REFACTOR GOALS
-// 3) unregister components which are assigned to 0 entities
-
 typedef uint16_t u16;
 typedef uint32_t u32;
 
@@ -48,10 +45,12 @@ class World;
 struct EntityHash;
 using EntityCallback = void (*)(Entity);
 using EntityPairCallback = void (*)(Entity, Entity);
+using ComponentList = std::vector<Entity>;
 
 namespace internal {
 
 struct Component {};  // marks an entity as a Component
+struct Tag {};        // marks entity as a Tag component (these entities will also have the Component tag for convenience)
 
 }  // namespace internal
 
@@ -131,6 +130,8 @@ public:
     const char* name() const;
     void setName(const char* name) const;
     void setName(std::string_view name) const;
+
+    ComponentList getComponents() const;
 
 private:
     EntityID mId = 0;
@@ -271,6 +272,8 @@ public:
 template <typename T>
 class Exclude;
 
+// This manages all components. For each registered component, it has an array of the component data, as well as an Entity which holds data about the
+// component. For tags, it only has the entities. No data.
 class ComponentManager {
     friend World;
 
@@ -279,7 +282,12 @@ public:
     ~ComponentManager();
 
     template <typename T>
+        requires(!std::is_empty_v<T>)
     void registerComponent();
+
+    template <typename T>
+        requires(std::is_empty_v<T>)
+    void registerTag();
 
     template <typename T>
     void addComponent(const Entity entity, T&& component) {
@@ -363,9 +371,20 @@ public:
     u32 getRegisteredCount() const { return mComponentArrays.size(); }
 
     template <typename T>
+        requires(!std::is_empty_v<T>)
     Entity getComponentEntity() {
         return mComponentEntities[getComponentID<T>()];
     }
+
+    Entity getComponentEntity(ComponentType type) { return mComponentEntities[type]; }
+
+    template <typename T>
+        requires(std::is_empty_v<T>)
+    Entity getTagEntity() {
+        return mTagEntities[getTagID<T>()];
+    }
+
+    Entity getTagEntity(ComponentType type) { return mTagEntities[type]; }
 
 private:
     template <typename T>
@@ -381,6 +400,7 @@ private:
 
     std::array<long, MAX_COMPONENTS> mComponentToIndex;
     std::array<Entity, MAX_COMPONENTS> mComponentEntities;
+    std::array<Entity, MAX_COMPONENTS> mTagEntities;
     std::vector<IComponentArray*> mComponentArrays;
 };
 
@@ -685,14 +705,22 @@ public:
     // COMPONENT
     u32 getComponentCount() const;
 
-    // registers a component (if not done already) and returns the associated entity.
+    // registers a component/tag (if not done already) and returns the associated entity.
     template <typename T>
     Entity component() const {
-        if (mComponentManager->getIndex<T>() == -1) {
-            // component not registered
-            mComponentManager->registerComponent<T>();
+        if constexpr (std::is_empty_v<T>) {
+            if (!mComponentManager->getTagEntity<T>().isValid()) {
+                // tag not registered
+                mComponentManager->registerTag<T>();
+            }
+            return mComponentManager->getTagEntity<T>();
+        } else {
+            if (mComponentManager->getIndex<T>() == -1) {
+                // component not registered
+                mComponentManager->registerComponent<T>();
+            }
+            return mComponentManager->getComponentEntity<T>();
         }
-        return mComponentManager->getComponentEntity<T>();
     }
 
     // SINGLETON COMPONENTS
@@ -708,7 +736,6 @@ public:
     }
 
     template <typename T>
-        requires(!std::is_empty_v<T>)
     void add() const {
         Entity e = component<T>();
         e.add<T>();
@@ -729,16 +756,20 @@ public:
     }
 
     template <typename T>
-        requires(!std::is_empty_v<T>)
     void remove() const {
-        Entity e = mComponentManager->getComponentEntity<T>();
+        // doesn't implicitly register a component because calling remove on an unregistered component is an error
+        Entity e;
+        if constexpr (std::is_empty_v<T>) {
+            e = mComponentManager->getTagEntity<T>();
+        } else {
+            e = mComponentManager->getComponentEntity<T>();
+        }
         e.remove<T>();
     }
 
     template <typename T>
-        requires(!std::is_empty_v<T>)
     bool has() const {
-        Entity e = mComponentManager->getComponentEntity<T>();
+        Entity e = component<T>();
         return e.has<T>();
     }
 
@@ -832,6 +863,9 @@ template <typename T>
     requires(std::is_empty_v<T>)
 Entity Entity::add() {
     const World& world = World::getInstance();
+    if (!world.mComponentManager->getTagEntity<T>().isValid()) {
+        world.mComponentManager->registerTag<T>();
+    }
     addTagToMgr(world, ComponentManager::getTagID<T>());
     return *this;
 }
@@ -914,6 +948,7 @@ void Entity::forChild(void(callback)(ecs::Entity, T...), bool isRecursive, T... 
 }
 
 template <typename T>
+    requires(!std::is_empty_v<T>)
 void ComponentManager::registerComponent() {
     const ComponentType type = getComponentID<T>();
     assert(type < MAX_COMPONENTS && "Registered more than MAX_COMPONENTS components");
@@ -925,6 +960,23 @@ void ComponentManager::registerComponent() {
     Entity e = World::getInstance().componentEntity(type);
     e.setName(type_of<T>());
     mComponentEntities[type] = e;
+    e.add<internal::Component>();
+}
+
+template <typename T>
+    requires(std::is_empty_v<T>)
+void ComponentManager::registerTag() {
+    const ComponentType type = getTagID<T>();
+    assert(type < MAX_COMPONENTS && "Registered more than MAX_COMPONENTS tags");
+    assert(mTagEntities[type].id() == 0 && "Tag type already registered");
+
+    Entity e = World::getInstance().componentEntity(type);
+    e.setName(type_of<T>());
+    mTagEntities[type] = e;
+
+    // must add these *after* setting mTagEntities, otherwise will infinitely recurse
+    e.add<internal::Component>();
+    e.add<internal::Tag>();
 }
 
 }  // namespace whal::ecs

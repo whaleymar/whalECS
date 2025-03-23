@@ -17,7 +17,7 @@ The main changes are:
 
 ## TODO
 
-### Need:
+### Nice To Have:
 
 - thread-safe system methods
 - parallelization
@@ -25,6 +25,9 @@ The main changes are:
     - would require changes to:
         - ComponentArray.add: push_back
         - ComponentArray.remove: pop_back
+- Unregister components which aren't used by any entities 
+    - if entity component is killed, component is unregistered and removed from all entities 
+
 
 ### Considering:
 - queue add/remove operations until end of frame? so i'm only iterating through the system stuff once. also avoids accidental mutation during update loops

@@ -102,6 +102,30 @@ void Entity::setName(std::string_view name) const {
     static_cast<EntityManager*>(World::getInstance().mEntityManager)->setEntityName(*this, name);
 }
 
+ComponentList Entity::getComponents() const {
+    World& world = World::getInstance();
+    EntityManager* pEM = static_cast<EntityManager*>(world.mEntityManager);
+
+    ComponentList result;
+
+    // components:
+    const Pattern& pattern = pEM->getPattern(*this);
+    for (size_t i = 0; i < pattern.size(); i++) {
+        if (pattern.test(i)) {
+            result.push_back(world.mComponentManager->getComponentEntity(i));
+        }
+    }
+
+    // tags:
+    const Pattern& tagPattern = pEM->getTagPattern(*this);
+    for (size_t i = 0; i < tagPattern.size(); i++) {
+        if (tagPattern.test(i)) {
+            result.push_back(world.mComponentManager->getTagEntity(i));
+        }
+    }
+    return result;
+}
+
 void Entity::removeFromMgr(const World& world, ComponentType t) {
     EntityManager* pEM = static_cast<EntityManager*>(world.mEntityManager);
     Pattern& pattern = pEM->getPatternMut(*this);
