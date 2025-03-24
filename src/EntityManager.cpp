@@ -41,6 +41,11 @@ void EntityManager::destroyEntity(Entity entity) {
     mPatterns[entity.mId].reset();     // invalidate pattern
     mTagPatterns[entity.mId].reset();  // invalidate pattern
     mAvailableIDs.push(entity.id());
+    auto it = mEntityNames.find(entity.id());
+    if (it != mEntityNames.end()) {
+        mNameToEntity.erase(it->second);
+        mEntityNames.erase(it);
+    }
     mEntityCount--;
 }
 
@@ -78,10 +83,12 @@ bool EntityManager::isActive(Entity entity) const {
 
 void EntityManager::setEntityName(Entity entity, const char* name) {
     mEntityNames[entity.id()] = name;
+    mNameToEntity[name] = entity;
 }
 
 void EntityManager::setEntityName(Entity entity, std::string_view name) {
     mEntityNames[entity.id()] = std::string(name);
+    mNameToEntity[std::string(name)] = entity;
 }
 
 const char* EntityManager::getEntityName(Entity entity) {
@@ -109,6 +116,14 @@ bool EntityManager::deactivate(Entity entity) {
     }
     mActiveEntities.reset(static_cast<u32>(entity.id()));
     return true;
+}
+
+Entity EntityManager::lookup(const char* name) const {
+    auto it = mNameToEntity.find(name);
+    if (it == mNameToEntity.end()) {
+        return Entity{};  // invalid entity
+    }
+    return it->second;
 }
 
 const std::unordered_set<Entity, EntityHash>& EntityManager::getChildren(Entity e) {

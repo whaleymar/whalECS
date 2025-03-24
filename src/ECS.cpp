@@ -155,6 +155,11 @@ void World::unparent(Entity e) const {
     pEM->parentToChildren[oldParent].erase(e);
 }
 
+Entity World::lookup(const char* name) const {
+    EntityManager* pEM = static_cast<EntityManager*>(mEntityManager);
+    return pEM->lookup(name);
+}
+
 bool World::isActive(Entity entity) const {
     return mEntityManager->isActive(entity);
 }

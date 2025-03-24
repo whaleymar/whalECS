@@ -792,6 +792,10 @@ public:
 
     void unparent(Entity e) const;  // removes `e` from all parent lists
 
+    // query an entity by name.
+    // Name uniqueness is not enforced. If multiple entities have the same name, returns the entity which was most recently created.
+    Entity lookup(const char* name) const;
+
     // SYSTEM
     template <typename T>
     T* getSystem() const {

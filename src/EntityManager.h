@@ -30,6 +30,8 @@ public:
     bool activate(Entity entity);
     bool deactivate(Entity entity);
 
+    Entity lookup(const char* name) const;
+
     const std::unordered_set<Entity, EntityHash>& getChildren(Entity e) override;
 
     std::unordered_map<Entity, Entity, EntityHash> childToParent;
@@ -42,6 +44,7 @@ private:
     DynamicBitset mActiveEntities;
     std::mutex mCreatorMutex;
     std::unordered_map<EntityID, std::string> mEntityNames;
+    std::unordered_map<std::string, Entity> mNameToEntity;  // names aren't unique. Up to end-user to only look up entities with unique names
     u32 mEntityCount = 0;
 };
 
