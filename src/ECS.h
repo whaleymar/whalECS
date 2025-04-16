@@ -158,17 +158,6 @@ struct EntityHash {
     u32 operator()(ecs::Entity entity) const { return entity.id(); }
 };
 
-// std::find from <algorithm> so I don't have to include the whole thing
-template <class InputIterator, class T>
-InputIterator whal_find(InputIterator first, InputIterator last, const T& val) {
-    while (first != last) {
-        if (*first == val)
-            return first;
-        ++first;
-    }
-    return last;
-}
-
 // methods run in a loop by component manager need to be virtual
 class IComponentArray {
 public:
