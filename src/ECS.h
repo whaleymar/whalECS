@@ -122,8 +122,9 @@ public:
     Entity createChild(const char* name, bool isActive = true) const;
     void orphan() const;  // makes mRootEntity the parent of `e`
 
-    template <typename... T>
-    void forChild(void(callback)(ecs::Entity, T...), bool isRecursive, T... args) const;
+    template <typename F, typename... Args>
+        requires std::invocable<F, Entity, Args...>
+    void forChild(F&& callback, bool isRecursive, Args&&... args) const;
 
     Entity parent() const;                                           // parent getter
     const std::unordered_set<Entity, EntityHash>& children() const;  // children getter
@@ -132,6 +133,8 @@ public:
     void setName(std::string_view name) const;
 
     ComponentList getComponents() const;
+    const Pattern& getPattern() const;
+    const Pattern& getTagPattern() const;
 
 private:
     EntityID mId = 0;
@@ -406,10 +409,11 @@ public:
     virtual ~SystemBase() = default;
 
     virtual std::unordered_map<EntityID, Entity>& getEntitiesVirtual() = 0;  // only used by SystemManager
-    virtual bool isPatternInSystem(const Pattern& pattern, const Pattern& tagPattern) = 0;
+    virtual bool isPatternInSystem(const Pattern& pattern, const Pattern& tagPattern) const = 0;
+    virtual bool isMatch(Entity entity) const = 0;
 };
 
-// might combine these two? not sure who would use it
+// might combine these two? Would be nice for resource allocations/cleanup
 // class IWorldStartSystem {
 // public:
 //     virtual void onStart() = 0;
@@ -460,6 +464,7 @@ public:
 
 class AttrUniqueEntity {};
 class AttrUpdateDuringPause {};
+class AttrExcludeChildren {};
 
 // each system has a set of entities it operates on
 // currently their methods are called manually
@@ -479,10 +484,13 @@ public:
     static std::unordered_map<EntityID, Entity> getEntitiesCopy() { return mEntities; }
     static const std::unordered_map<EntityID, Entity>& getEntities() { return mEntities; }
     static Entity first() { return mEntities.begin()->second; }
-    bool isPatternInSystem(const Pattern& pattern, const Pattern& tagPattern) override {
+    bool isPatternInSystem(const Pattern& pattern, const Pattern& tagPattern) const override {
         return (pattern & mPattern) == mPattern && (pattern & mAntiPattern).all_zero() && (tagPattern & mTagPattern) == mTagPattern &&
                (tagPattern & mTagAntiPattern).all_zero();
     }
+
+    // this is about 7x slower than getEntities().contains(e.id())
+    bool isMatch(Entity e) const override { return isPatternInSystem(e.getPattern(), e.getTagPattern()); }
 
 private:
     // need a First and Second, otherwise there is ambiguity when there's only one
@@ -557,6 +565,7 @@ public:
     enum Attributes : u16 {
         UniqueEntity = 1,
         UpdateDuringPause = 1 << 1,
+        ExcludeChildren = 1 << 2,
     };
 
     template <class T>
@@ -598,6 +607,9 @@ public:
         }
         if (toInterfacePtr<T, AttrUpdateDuringPause>(system)) {
             attributes |= UpdateDuringPause;
+        }
+        if (toInterfacePtr<T, AttrExcludeChildren>(system)) {
+            attributes |= ExcludeChildren;
         }
         mAttributes.push_back(attributes);
 
@@ -926,16 +938,17 @@ bool Entity::has() const {
     return _hasTag(ComponentManager::getTagID<T>());
 }
 
-template <typename... T>
-void Entity::forChild(void(callback)(ecs::Entity, T...), bool isRecursive, T... args) const {
+template <typename F, typename... Args>
+    requires std::invocable<F, Entity, Args...>
+void Entity::forChild(F&& callback, bool isRecursive, Args&&... args) const {
     if (isRecursive) {
         for (const Entity& child : World::getInstance().mEntityManager->getChildren(*this)) {
-            callback(child, args...);
-            child.forChild(callback, true, args...);
+            callback(child, std::forward<Args>(args)...);
+            child.forChild(std::forward<F>(callback), true, std::forward<Args>(args)...);
         }
     } else {
         for (const Entity& child : World::getInstance().mEntityManager->getChildren(*this)) {
-            callback(child, args...);
+            callback(child, std::forward<Args>(args)...);
         }
     }
 }

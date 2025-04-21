@@ -126,6 +126,16 @@ ComponentList Entity::getComponents() const {
     return result;
 }
 
+const Pattern& Entity::getPattern() const {
+    const EntityManager* pEM = static_cast<EntityManager*>(World::getInstance().mEntityManager);
+    return pEM->getPattern(*this);
+}
+
+const Pattern& Entity::getTagPattern() const {
+    const EntityManager* pEM = static_cast<EntityManager*>(World::getInstance().mEntityManager);
+    return pEM->getTagPattern(*this);
+}
+
 void Entity::removeFromMgr(const World& world, ComponentType t) {
     EntityManager* pEM = static_cast<EntityManager*>(world.mEntityManager);
     Pattern& pattern = pEM->getPatternMut(*this);

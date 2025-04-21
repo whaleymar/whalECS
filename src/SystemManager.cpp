@@ -49,26 +49,44 @@ void SystemManager::onEntityDestroyed(const Entity entity) const {
     }
 }
 
+static void tryRemoveFromSystem(Entity entity, SystemBase* system, IMonitorSystem* pMonitor) {
+    auto it = system->getEntitiesVirtual().find(entity.id());
+    if (it != system->getEntitiesVirtual().end()) {
+        if (pMonitor)
+            pMonitor->onRemove(entity);
+        system->getEntitiesVirtual().erase(it);
+        entity.forChild(tryRemoveFromSystem, false, system, pMonitor);
+    }
+}
+
 void SystemManager::onEntityPatternChanged(const Entity entity, const Pattern& newEntityPattern, const Pattern& newTagPattern) const {
     // TODO make thread safe
     for (size_t i = 0; i < mSystems.size(); i++) {
-        auto const ix = mSystems[i]->getEntitiesVirtual().find(entity.id());
-        if (mSystems[i]->isPatternInSystem(newEntityPattern, newTagPattern)) {
-            if (ix != mSystems[i]->getEntitiesVirtual().end()) {
+        SystemBase* system = mSystems[i];
+        auto const ix = system->getEntitiesVirtual().find(entity.id());
+        bool isExcluded = (mAttributes[i] & ExcludeChildren) > 0 && system->isMatch(entity.parent());
+        bool isPatternMatch = system->isPatternInSystem(newEntityPattern, newTagPattern);
+        if (isPatternMatch && !isExcluded) {
+            if (ix != system->getEntitiesVirtual().end()) {
                 // already in system
                 continue;
             }
-            assert((!((mAttributes[i] & Attributes::UniqueEntity) > 0) || mSystems[i]->getEntitiesVirtual().size() < 1) &&
+            assert((!((mAttributes[i] & Attributes::UniqueEntity) > 0) || system->getEntitiesVirtual().size() < 1) &&
                    "Trying to assign more than one entity to system with UniqueEntity attribute");
-            mSystems[i]->getEntitiesVirtual().insert({entity.id(), entity});
+            system->getEntitiesVirtual().insert({entity.id(), entity});
             if (mMonitorSystems[i] != nullptr) {
                 mMonitorSystems[i]->onAdd(entity);
             }
-        } else if (ix != mSystems[i]->getEntitiesVirtual().end()) {
+
+            if ((mAttributes[i] & ExcludeChildren) > 0) {
+                // now that this entity is added, make sure its children aren't in this system
+                entity.forChild(tryRemoveFromSystem, false, system, mMonitorSystems[i]);
+            }
+        } else if (ix != system->getEntitiesVirtual().end()) {
             if (mMonitorSystems[i] != nullptr) {
                 mMonitorSystems[i]->onRemove(entity);
             }
-            mSystems[i]->getEntitiesVirtual().erase(entity.id());
+            system->getEntitiesVirtual().erase(entity.id());
         }
     }
 }
