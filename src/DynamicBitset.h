@@ -128,11 +128,11 @@ public:
             size_t used_bits_in_last_block = mNumBits % BITS_PER_BLOCK;
             if (used_bits_in_last_block == 0) {
                 // Last block is full, simple comparison
-                return mBlocks.back() == other.mBlocks.back();
+                return mBlocks[full_blocks] == other.mBlocks[full_blocks];
             } else {
                 // Create mask for used bits in last block
                 BlockType mask = (BlockType(1) << used_bits_in_last_block) - 1;
-                return (mBlocks.back() & mask) == (other.mBlocks.back() & mask);
+                return (mBlocks[full_blocks] & mask) == (other.mBlocks[full_blocks] & mask);
             }
         }
 
@@ -143,10 +143,77 @@ public:
     // Inequality operator
     bool operator!=(const DynamicBitset& other) const { return !(*this == other); }
 
+    // Returns true if all bits in `other` are also 1 in `this`
+    bool contains(const DynamicBitset& other) const {
+        // if we have fewer bits than other, we can't check all bits
+        if (mNumBits < other.mNumBits) {
+            return false;
+        }
+
+        // Check all complete blocks
+        size_t full_blocks = mBlocks.size() - 1;
+        for (size_t i = 0; i < full_blocks; ++i) {
+            if ((mBlocks[i] & other.mBlocks[i]) != mBlocks[i]) {
+                return false;
+            }
+        }
+
+        // For the last block, mask out unused bits before comparing
+        if (mBlocks.size() > 0) {
+            size_t used_bits_in_last_block = mNumBits % BITS_PER_BLOCK;
+            if (used_bits_in_last_block == 0) {
+                // Last block is full, simple comparison
+                return (mBlocks[full_blocks] & other.mBlocks[full_blocks]) == mBlocks[full_blocks];
+            } else {
+                // Create mask for used bits in last block
+                BlockType mask = (BlockType(1) << used_bits_in_last_block) - 1;
+                BlockType thisMasked = mBlocks[full_blocks] & mask;
+                return ((other.mBlocks[full_blocks] & mask) & thisMasked) == thisMasked;
+            }
+        }
+
+        // both are empty
+        return true;
+    }
+
+    // returns true if all bits in `other` are 0 in `this`
+    bool containsNone(const DynamicBitset& other) const {
+        // if we have fewer bits than other, we can't check all bits
+        if (mNumBits < other.mNumBits) {
+            return false;
+        }
+
+        // Check all complete blocks
+        size_t full_blocks = mBlocks.size() - 1;
+        for (size_t i = 0; i < full_blocks; ++i) {
+            if ((mBlocks[i] & other.mBlocks[i]) > 0) {
+                return false;
+            }
+        }
+
+        // For the last block, mask out unused bits before comparing
+        if (mBlocks.size() > 0) {
+            size_t used_bits_in_last_block = mNumBits % BITS_PER_BLOCK;
+            if (used_bits_in_last_block == 0) {
+                // Last block is full, simple comparison
+                return (mBlocks[full_blocks] & other.mBlocks[full_blocks]) == 0;
+            } else {
+                // Create mask for used bits in last block
+                BlockType mask = (BlockType(1) << used_bits_in_last_block) - 1;
+                BlockType otherMasked = other.mBlocks[full_blocks] & mask;
+                return ((mBlocks[full_blocks] & mask) & otherMasked) == 0;
+            }
+        }
+
+        // both are empty
+        return true;
+    }
+
     // Test if all bits are zero
     bool all_zero() const {
         // Check all complete mBlocks first
-        for (size_t i = 0; i < mBlocks.size() - 1; ++i) {
+        size_t full_blocks = mBlocks.size() - 1;
+        for (size_t i = 0; i < full_blocks; ++i) {
             if (mBlocks[i] != 0) {
                 return false;
             }
@@ -157,11 +224,11 @@ public:
             size_t used_bits_in_last_block = mNumBits % BITS_PER_BLOCK;
             if (used_bits_in_last_block == 0) {
                 // Last block is fully used, just check if it's zero
-                return mBlocks.back() == 0;
+                return mBlocks[full_blocks] == 0;
             } else {
                 // Create mask for used bits in last block
                 BlockType mask = (BlockType(1) << used_bits_in_last_block) - 1;
-                return (mBlocks.back() & mask) == 0;
+                return (mBlocks[full_blocks] & mask) == 0;
             }
         }
 

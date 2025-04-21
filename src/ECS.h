@@ -485,11 +485,10 @@ public:
     static const std::unordered_map<EntityID, Entity>& getEntities() { return mEntities; }
     static Entity first() { return mEntities.begin()->second; }
     bool isPatternInSystem(const Pattern& pattern, const Pattern& tagPattern) const override {
-        return (pattern & mPattern) == mPattern && (pattern & mAntiPattern).all_zero() && (tagPattern & mTagPattern) == mTagPattern &&
-               (tagPattern & mTagAntiPattern).all_zero();
+        return mPattern.contains(pattern) && mTagPattern.contains(tagPattern) && mAntiPattern.containsNone(pattern) &&
+               mTagAntiPattern.containsNone(tagPattern);
     }
 
-    // this is about 7x slower than getEntities().contains(e.id())
     bool isMatch(Entity e) const override { return isPatternInSystem(e.getPattern(), e.getTagPattern()); }
 
 private:
