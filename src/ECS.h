@@ -16,12 +16,6 @@
 typedef uint16_t u16;
 typedef uint32_t u32;
 
-namespace whal::gfx {
-struct EntityRenderInfo;
-struct RenderContext;
-class RenderQueue;
-}  // namespace whal::gfx
-
 #ifndef MAX_ENTITIES
 #define MAX_ENTITIES 5000
 #endif
@@ -441,27 +435,6 @@ public:
     virtual void onRemove(const Entity entity) = 0;
 };
 
-class IReactToPause {
-public:
-    virtual void onPause() = 0;
-    virtual void onUnpause() = 0;
-};
-
-class IRender {
-public:
-    // Draw a single entity.
-    virtual void draw(const gfx::EntityRenderInfo& entityInfo, const gfx::RenderContext& ctx) const = 0;
-
-    // Adds all entities to the draw queue. Culling is performed automatically.
-    virtual void addToQueue(gfx::RenderQueue& queue) const = 0;
-};
-
-class IRenderLight {
-public:
-    // Draws all lights to the lighting texture.
-    virtual void draw(const gfx::RenderContext& ctx) const = 0;
-};
-
 class AttrUniqueEntity {};
 class AttrUpdateDuringPause {};
 class AttrExcludeChildren {};
@@ -549,11 +522,6 @@ I* toInterfacePtr(const T* const ptr) {
     return nullptr;
 }
 
-struct RenderSystemPair {
-    IRender* pIRender;
-    SystemBase* pSystem;
-};
-
 class SystemManager {
     struct UpdateGroupInfo {
         int intervalFrame;
@@ -588,17 +556,6 @@ public:
         // The way these two interfaces are used, it's convenient for these list's indices to match with mSystems
         mUpdateSystems.push_back(toInterfacePtr<T, IUpdate>(system));
         mMonitorSystems.push_back(toInterfacePtr<T, IMonitorSystem>(system));
-
-        // Check other interfaces. These lists don't store nullptrs;
-        if (auto iPtr = toInterfacePtr<T, IReactToPause>(system); iPtr) {
-            mPauseSystems.push_back(iPtr);
-        }
-        if (auto iPtr = toInterfacePtr<T, IRender>(system); iPtr) {
-            mRenderSystems.push_back({iPtr, system});
-        }
-        if (auto iPtr = toInterfacePtr<T, IRenderLight>(system); iPtr) {
-            mLightRenderSystems.push_back(iPtr);
-        }
 
         // check attributes
         if (toInterfacePtr<T, AttrUniqueEntity>(system)) {
@@ -665,9 +622,6 @@ public:
     void onPaused();
     void onUnpaused();
 
-    const std::vector<RenderSystemPair>& getRenderSystems() const { return mRenderSystems; }
-    const std::vector<IRenderLight*>& getLightSystems() const { return mLightRenderSystems; }
-
 private:
     // assign unique IDs to each system type
     static inline SystemId SystemID = 0;
@@ -681,9 +635,6 @@ private:
     std::vector<SystemBase*> mSystems;
     std::vector<IUpdate*> mUpdateSystems;          // may contain null ptrs
     std::vector<IMonitorSystem*> mMonitorSystems;  // may contain null ptrs
-    std::vector<IReactToPause*> mPauseSystems;
-    std::vector<RenderSystemPair> mRenderSystems;
-    std::vector<IRenderLight*> mLightRenderSystems;
     std::vector<u16> mAttributes;
 
     std::vector<std::pair<UpdateGroupInfo, std::vector<int>>>
@@ -806,9 +757,6 @@ public:
     T* registerSystem(u16 attributes = 0) const {
         return mSystemManager->registerSystem<T>(attributes);
     }
-
-    const std::vector<RenderSystemPair>& getRenderSystems() const { return mSystemManager->getRenderSystems(); }
-    const std::vector<IRenderLight*>& getLightSystems() const { return mSystemManager->getLightSystems(); }
 
     // this doesn't do anything, but I want the caller code to be understandable
     SystemManager& BeginSystemRegistration() const { return *mSystemManager; }

@@ -11,8 +11,6 @@ void SystemManager::clear() {
     mSystems.clear();
     mUpdateSystems.clear();
     mMonitorSystems.clear();
-    mPauseSystems.clear();
-    mRenderSystems.clear();
     mAttributes.clear();
     mUpdateGroups.clear();
     mFrame = 0;
@@ -92,21 +90,11 @@ void SystemManager::onEntityPatternChanged(const Entity entity, const Pattern& n
 }
 
 void SystemManager::onPaused() {
-    assert(!mIsWorldPaused);
-
     mIsWorldPaused = true;
-    for (auto pSystem : mPauseSystems) {
-        pSystem->onPause();
-    }
 }
 
 void SystemManager::onUnpaused() {
-    assert(mIsWorldPaused);
-
     mIsWorldPaused = false;
-    for (auto pSystem : mPauseSystems) {
-        pSystem->onUnpause();
-    }
 }
 
 }  // namespace whal::ecs
