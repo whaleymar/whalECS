@@ -7,7 +7,9 @@ void SystemManager::clear() {
         sys->getEntitiesVirtual().clear();
         delete sys;
     }
-    mSystemIdToIndex.clear();
+    for (auto it = mSystemIdToIndex.begin(); it != mSystemIdToIndex.end(); ++it) {
+        *it = -1;
+    }
     mSystems.clear();
     mUpdateSystems.clear();
     mMonitorSystems.clear();

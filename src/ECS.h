@@ -538,18 +538,40 @@ public:
     template <class T>
     T* getSystem() const {
         const SystemId id = getSystemID<T>();
-        assert(mSystemIdToIndex.contains(id) && "System not registered");
 
-        return static_cast<T*>(mSystems[mSystemIdToIndex.at(id)]);
+        // if idToIndex's size is <= to ID, then we've never registered this system.
+        // otherwise, make sure this ID corresponds to a registered system (not -1).
+        assert(mSystemIdToIndex.size() > static_cast<size_t>(id) && mSystemIdToIndex[id] != -1 && "System not registered");
+
+        return static_cast<T*>(mSystems[mSystemIdToIndex[id]]);
     }
 
     template <class T>
     T* registerSystem(u16 attributes = 0) {
         static_assert(is_base_of_template<ISystem, T>::value, "Cannot register class which doesn't inherit ISystem");
         const SystemId id = getSystemID<T>();
-        assert(!mSystemIdToIndex.contains(id) && "System already registered");
 
-        mSystemIdToIndex.insert({id, mSystems.size()});
+        // if idToIndex's size is > ID, we've generated an ID for this type before.
+        // if we have, make sure it is unregistered (is -1)
+        const size_t id_t = static_cast<size_t>(id);
+        assert(mSystemIdToIndex.size() <= id_t || mSystemIdToIndex[id_t] == -1 && "System already registered");
+
+        if (id_t == mSystemIdToIndex.size()) {
+            mSystemIdToIndex.push_back(mSystems.size());
+        } else if (id_t > mSystemIdToIndex.size()) {
+            // we've generated some System IDs since the last time something was registered. Add -1s for each one we've generated (up to and including
+            // the current ID)
+            long toAdd = id_t - mSystemIdToIndex.size() + 1;
+            for (long i = 0; i < toAdd; i++) {
+                mSystemIdToIndex.push_back(-1);
+            }
+
+            // set the id's index
+            mSystemIdToIndex[id_t] = mSystems.size();
+        } else {
+            // id was generated previously and another system has since been registered, so our index is -1. Update it.
+            mSystemIdToIndex[id_t] = mSystems.size();
+        }
 
         T* system = new T;
 
@@ -631,7 +653,13 @@ private:
         return id;
     }
 
-    std::unordered_map<SystemId, int> mSystemIdToIndex;
+    template <typename T>
+    long getIndex() {
+        SystemId id = getSystemID<T>();
+        return mSystemIdToIndex[id];
+    }
+
+    std::vector<long> mSystemIdToIndex;
     std::vector<SystemBase*> mSystems;
     std::vector<IUpdate*> mUpdateSystems;          // may contain null ptrs
     std::vector<IMonitorSystem*> mMonitorSystems;  // may contain null ptrs
