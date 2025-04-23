@@ -359,10 +359,10 @@ public:
     template <typename T>
         requires(!std::is_empty_v<T>)
     Entity getComponentEntity() {
-        return mComponentEntities[getComponentID<T>()];
+        return mComponentEntities[getIndex<T>()];
     }
 
-    Entity getComponentEntity(ComponentType type) { return mComponentEntities[type]; }
+    Entity getComponentEntity(ComponentType type) { return mComponentEntities[mComponentToIndex[type]]; }
 
     template <typename T>
         requires(std::is_empty_v<T>)
@@ -385,7 +385,7 @@ private:
     }
 
     std::array<long, MAX_COMPONENTS> mComponentToIndex;
-    std::array<Entity, MAX_COMPONENTS> mComponentEntities;
+    std::vector<Entity> mComponentEntities;
     std::array<Entity, MAX_COMPONENTS> mTagEntities;
     std::vector<IComponentArray*> mComponentArrays;
 };
@@ -934,13 +934,14 @@ void ComponentManager::registerComponent() {
     const ComponentType type = getComponentID<T>();
     assert(type < MAX_COMPONENTS && "Registered more than MAX_COMPONENTS components");
     assert(getIndex<T>() == -1 && "Component type already registered");
-    mComponentToIndex[type] = mComponentArrays.size();
+    const long newIndex = mComponentArrays.size();
+    mComponentToIndex[type] = newIndex;
     mComponentArrays.push_back(new ComponentArray<T>());
 
     // not passing name here because I need to include string to parse the string_view and I'd rather do that in a source file.
     Entity e = World::getInstance().componentEntity(type);
     e.setName(type_of<T>());
-    mComponentEntities[type] = e;
+    mComponentEntities.push_back(e);
     e.add<internal::Component>();
 }
 
