@@ -143,6 +143,18 @@ void Entity::removeFromMgr(const World& world, ComponentType t) {
     if (world.isActive(*this)) {
         world.mSystemManager->onEntityPatternChanged(*this, pattern, pEM->getTagPattern(*this));
     }
+
+    if (has<internal::Tag>()) {
+        Entity trait = world.mComponentManager->getComponentEntity(t);
+        if (trait != *this) {
+            trait.removeTraitImplementer(get<internal::Tag>().id, true);
+        }
+    } else if (has<internal::Component>()) {
+        Entity trait = world.mComponentManager->getComponentEntity(t);
+        if (trait != *this) {
+            trait.removeTraitImplementer(get<internal::Component>().id, false);
+        }
+    }
 }
 
 void Entity::removeTagFromMgr(const World& world, ComponentType t) {
@@ -157,18 +169,89 @@ void Entity::removeTagFromMgr(const World& world, ComponentType t) {
 void Entity::addToMgr(const World& world, ComponentType t) {
     EntityManager* pEM = static_cast<EntityManager*>(world.mEntityManager);
     Pattern& pattern = pEM->getPatternMut(*this);
+    if (pattern.test(t)) {
+        // we already had this component. Nothing to do.
+        return;
+    }
+
     pattern.set(t, true);
     if (world.isActive(*this)) {
         world.mSystemManager->onEntityPatternChanged(*this, pattern, pEM->getTagPattern(*this));
+    }
+
+    // check if we are a component with a trait being added to us
+    if (has<internal::Tag>()) {
+        Entity trait = world.mComponentManager->getComponentEntity(t);
+        if (trait != *this && trait != world.component<internal::Component>() && trait != world.component<internal::Tag>()) {
+            trait.addTraitImplementer(get<internal::Tag>().id, true);
+        }
+    } else if (has<internal::Component>()) {
+        Entity trait = world.mComponentManager->getComponentEntity(t);
+        if (trait != *this && trait != world.component<internal::Component>() && trait != world.component<internal::Tag>()) {
+            trait.addTraitImplementer(get<internal::Component>().id, false);
+        }
     }
 }
 
 void Entity::addTagToMgr(const World& world, ComponentType t) {
     EntityManager* pEM = static_cast<EntityManager*>(world.mEntityManager);
     Pattern& pattern = pEM->getTagPatternMut(*this);
+    if (pattern.test(t)) {
+        // we already had this component. Nothing to do.
+        return;
+    }
+
     pattern.set(t, true);
     if (world.isActive(*this)) {
         world.mSystemManager->onEntityPatternChanged(*this, pEM->getPattern(*this), pattern);
+    }
+
+    // check if we are a component with a trait being added to us
+    if (has<internal::Tag>()) {
+        Entity trait = world.mComponentManager->getTagEntity(t);
+        if (trait != *this && trait != world.component<internal::Component>() && trait != world.component<internal::Tag>()) {
+            trait.addTraitImplementer(get<internal::Tag>().id, true);
+        }
+    } else if (has<internal::Component>()) {
+        Entity trait = world.mComponentManager->getTagEntity(t);
+        if (trait != *this && trait != world.component<internal::Component>() && trait != world.component<internal::Tag>()) {
+            trait.addTraitImplementer(get<internal::Component>().id, false);
+        }
+    }
+}
+
+void Entity::addTraitImplementer(ComponentType implementer, bool isImplementerTag) {
+    internal::TraitUsers* users = tryGet<internal::TraitUsers>();
+    if (users) {
+        if (isImplementerTag) {
+            users->tagPattern.set(implementer);
+
+        } else {
+            users->componentPattern.set(implementer);
+        }
+    } else {
+        DynamicBitset pattern(MAX_COMPONENTS);
+        pattern.set(implementer);
+        if (isImplementerTag) {
+            add<internal::TraitUsers>({
+                .componentPattern = DynamicBitset(MAX_COMPONENTS),
+                .tagPattern = pattern,
+            });
+        } else {
+            add<internal::TraitUsers>({
+                .componentPattern = pattern,
+                .tagPattern = DynamicBitset(MAX_COMPONENTS),
+            });
+        }
+    }
+}
+
+void Entity::removeTraitImplementer(ComponentType implementer, bool isImplementerTag) {
+    internal::TraitUsers users = get<internal::TraitUsers>();
+    if (isImplementerTag) {
+        users.tagPattern.set(implementer, 0);
+    } else {
+        users.componentPattern.set(implementer, 0);
     }
 }
 

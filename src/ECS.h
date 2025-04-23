@@ -43,8 +43,24 @@ using ComponentList = std::vector<Entity>;
 
 namespace internal {
 
-struct Component {};  // marks an entity as a Component
-struct Tag {};        // marks entity as a Tag component (these entities will also have the Component tag for convenience)
+// marks an entity as a Component
+struct Component {
+    ComponentType id;
+};
+
+// marks entity as a Tag component (these entities will also have the Component tag for convenience)
+struct Tag {
+    ComponentType id;
+};
+
+// Components uses by other components are called Traits*.
+// When a component T is added to another component C, then C implements the trait T.
+// Any component used as a trait is given the TraitUsers struct to cache which components implement it.
+// * An exception is made for components added to themselves (which is how singleton components are implemented).
+struct TraitUsers {
+    Pattern componentPattern;
+    Pattern tagPattern;
+};
 
 }  // namespace internal
 
@@ -103,6 +119,12 @@ public:
         requires(std::is_empty_v<T>)
     bool has() const;
 
+    template <typename T>
+    const T& getTrait() const;
+
+    template <typename T>
+    Entity getTraitHolder() const;
+
     Entity copy(bool isActive = true) const;
 
     void activate() const;
@@ -137,6 +159,8 @@ private:
     void removeTagFromMgr(const World& world, ComponentType t);
     void addToMgr(const World& world, ComponentType t);
     void addTagToMgr(const World& world, ComponentType t);
+    void addTraitImplementer(ComponentType implementer, bool isImplementerTag);
+    void removeTraitImplementer(ComponentType implementer, bool isImplementerTag);
     bool _has(ComponentType t) const;
     bool _hasTag(ComponentType t) const;
 };
@@ -907,6 +931,44 @@ bool Entity::has() const {
     return _hasTag(ComponentManager::getTagID<T>());
 }
 
+template <typename T>
+Entity Entity::getTraitHolder() const {
+    World& world = World::getInstance();
+    const Entity traitEntity = world.component<T>();
+    const Pattern& cmpPattern = getPattern();
+
+    const internal::TraitUsers* traitUsers = traitEntity.tryGet<internal::TraitUsers>();
+    if (!traitUsers) {
+        // this trait is not implemented by any components
+        return Entity{};
+    }
+    const Pattern& traitPattern = traitUsers->componentPattern;
+
+    // matchIx > size() if there's no match
+    size_t matchIx = traitPattern.getIndexOfFirstMatch(cmpPattern);
+    if (matchIx < traitPattern.size()) {
+        return world.mComponentManager->getComponentEntity(matchIx);
+    }
+
+    // no match on components. check tags.
+    const Pattern& tagPattern = getTagPattern();
+    const Pattern& traitTagPattern = traitEntity.getTagPattern();
+    matchIx = traitTagPattern.getIndexOfFirstMatch(tagPattern);
+    if (matchIx < traitTagPattern.size()) {
+        return world.mComponentManager->getTagEntity(matchIx);
+    }
+
+    // trait not found in entity
+    return Entity{};
+}
+
+template <typename T>
+const T& Entity::getTrait() const {
+    Entity traitHolder = getTraitHolder<T>();
+    assert(traitHolder.isValid() && "getTrait called on Entity without trait");
+    return traitHolder.get<T>();
+}
+
 template <typename F, typename... Args>
     requires std::invocable<F, Entity, Args...>
 void Entity::forChild(F&& callback, bool isRecursive, Args&&... args) const {
@@ -936,7 +998,7 @@ void ComponentManager::registerComponent() {
     Entity e = World::getInstance().componentEntity(type);
     e.setName(type_of<T>());
     mComponentEntities.push_back(e);
-    e.add<internal::Component>();
+    e.add<internal::Component>({.id = type});
 }
 
 template <typename T>
@@ -951,8 +1013,8 @@ void ComponentManager::registerTag() {
     mTagEntities[type] = e;
 
     // must add these *after* setting mTagEntities, otherwise will infinitely recurse
-    e.add<internal::Component>();
-    e.add<internal::Tag>();
+    e.add<internal::Component>({.id = MAX_COMPONENTS + 1});
+    e.add<internal::Tag>({.id = type});
 }
 
 }  // namespace whal::ecs
