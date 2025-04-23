@@ -277,7 +277,7 @@ public:
 
     template <typename T>
     void addComponent(const Entity entity, T&& component) {
-        long index = getIndex<T>();
+        long index = mComponentToIndex[getComponentID<T>()];
         if (index == -1) {
             registerComponent<T>();
             index = mComponentArrays.size() - 1;
@@ -287,12 +287,12 @@ public:
 
     template <typename T>
     void setComponent(const Entity entity, T&& component) {
-        getComponentArray<T>(getIndex<T>())->setData(entity, std::move(component));
+        getComponentArray<T>(mComponentToIndex[getComponentID<T>()])->setData(entity, std::move(component));
     }
 
     template <typename T>
     void removeComponent(const Entity entity) const {
-        const long ix = getIndex<T>();
+        const long ix = mComponentToIndex[getComponentID<T>()];
         if (ix == -1) {
             return;
         }
@@ -301,7 +301,7 @@ public:
 
     template <typename T>
     bool hasComponent(const Entity entity) const {
-        const long ix = getIndex<T>();
+        const long ix = mComponentToIndex[getComponentID<T>()];
         if (ix == -1) {
             return false;
         }
@@ -310,7 +310,7 @@ public:
 
     template <typename T>
     T* tryGetComponent(const Entity entity) const {
-        const long ix = getIndex<T>();
+        const long ix = mComponentToIndex[getComponentID<T>()];
         if (ix == -1) {
             return nullptr;
         }
@@ -319,7 +319,7 @@ public:
 
     template <typename T>
     T& getComponent(const Entity entity) const {
-        return getComponentArray<T>(getIndex<T>())->getData(entity);
+        return getComponentArray<T>(mComponentToIndex[getComponentID<T>()])->getData(entity);
     }
 
     void entityDestroyed(const Entity entity);
@@ -359,7 +359,7 @@ public:
     template <typename T>
         requires(!std::is_empty_v<T>)
     Entity getComponentEntity() {
-        return mComponentEntities[getIndex<T>()];
+        return mComponentEntities[mComponentToIndex[getComponentID<T>()]];
     }
 
     Entity getComponentEntity(ComponentType type) { return mComponentEntities[mComponentToIndex[type]]; }
@@ -376,12 +376,6 @@ private:
     template <typename T>
     ComponentArray<T>* getComponentArray(int ix) const {
         return static_cast<ComponentArray<T>*>(mComponentArrays[ix]);
-    }
-
-    template <typename T>
-    long getIndex() const {
-        const ComponentType type = getComponentID<T>();
-        return mComponentToIndex[type];
     }
 
     std::array<long, MAX_COMPONENTS> mComponentToIndex;
@@ -580,13 +574,13 @@ public:
         mMonitorSystems.push_back(toInterfacePtr<T, IMonitorSystem>(system));
 
         // check attributes
-        if (toInterfacePtr<T, AttrUniqueEntity>(system)) {
+        if (std::derived_from<T, AttrUniqueEntity>) {
             attributes |= UniqueEntity;
         }
-        if (toInterfacePtr<T, AttrUpdateDuringPause>(system)) {
+        if (std::derived_from<T, AttrUpdateDuringPause>) {
             attributes |= UpdateDuringPause;
         }
-        if (toInterfacePtr<T, AttrExcludeChildren>(system)) {
+        if (std::derived_from<T, AttrExcludeChildren>) {
             attributes |= ExcludeChildren;
         }
         mAttributes.push_back(attributes);
@@ -694,7 +688,7 @@ public:
             }
             return mComponentManager->getTagEntity<T>();
         } else {
-            if (mComponentManager->getIndex<T>() == -1) {
+            if (mComponentManager->mComponentToIndex[mComponentManager->getComponentID<T>()] == -1) {
                 // component not registered
                 mComponentManager->registerComponent<T>();
             }
@@ -933,7 +927,7 @@ template <typename T>
 void ComponentManager::registerComponent() {
     const ComponentType type = getComponentID<T>();
     assert(type < MAX_COMPONENTS && "Registered more than MAX_COMPONENTS components");
-    assert(getIndex<T>() == -1 && "Component type already registered");
+    assert(mComponentToIndex[getComponentID<T>()] == -1 && "Component type already registered");
     const long newIndex = mComponentArrays.size();
     mComponentToIndex[type] = newIndex;
     mComponentArrays.push_back(new ComponentArray<T>());
