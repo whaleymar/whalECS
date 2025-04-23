@@ -5,23 +5,6 @@
 #include <vector>
 
 class DynamicBitset {
-private:
-    // Use uint64_t for maximum performance on 64-bit architectures
-    using BlockType = uint64_t;
-    static constexpr size_t BITS_PER_BLOCK = sizeof(BlockType) * CHAR_BIT;
-
-    std::vector<BlockType> mBlocks;
-    size_t mNumBits;
-
-    // Calculate which block a bit is in
-    inline size_t block_index(size_t pos) const { return pos / BITS_PER_BLOCK; }
-
-    // Calculate bit position within a block
-    inline size_t bit_index(size_t pos) const { return pos % BITS_PER_BLOCK; }
-
-    // Create mask for a single bit
-    inline BlockType bit_mask(size_t pos) const { return BlockType(1) << bit_index(pos); }
-
 public:
     // Default constructor creates empty bitset
     DynamicBitset();
@@ -176,13 +159,8 @@ public:
         return true;
     }
 
-    // returns true if all bits in `other` are 0 in `this`
+    // returns true if all bits in `other` are 0 in `this`.
     bool containsNone(const DynamicBitset& other) const {
-        // if we have fewer bits than other, we can't check all bits
-        if (mNumBits < other.mNumBits) {
-            return false;
-        }
-
         // Check all complete blocks
         size_t full_blocks = mBlocks.size() - 1;
         for (size_t i = 0; i < full_blocks; ++i) {
@@ -209,8 +187,10 @@ public:
         return true;
     }
 
+    bool containsAny(const DynamicBitset& other) const { return !containsNone(other); }
+
     // Test if all bits are zero
-    bool all_zero() const {
+    bool allZero() const {
         // Check all complete mBlocks first
         size_t full_blocks = mBlocks.size() - 1;
         for (size_t i = 0; i < full_blocks; ++i) {
@@ -236,6 +216,44 @@ public:
         return true;
     }
 
+    // returns index of least significant bit where `this` and `other` both have a value of 1
+    size_t getIndexOfFirstMatch(const DynamicBitset& other) const {
+        // Check all complete blocks
+        size_t full_blocks = mBlocks.size() - 1;
+        size_t offset = 0;
+        for (size_t i = 0; i < full_blocks; ++i) {
+            BlockType val = mBlocks[i] & other.mBlocks[i];
+            if (val > 0) {
+                return offset + std::countr_zero(val);
+            }
+            offset += BITS_PER_BLOCK;
+        }
+
+        // For the last block, mask out unused bits before comparing
+        if (mBlocks.size() > 0) {
+            size_t used_bits_in_last_block = mNumBits % BITS_PER_BLOCK;
+            if (used_bits_in_last_block == 0) {
+                // Last block is full, simple comparison
+                size_t val = mBlocks[full_blocks] & other.mBlocks[full_blocks];
+                if (val > 0) {
+                    return offset + std::countr_zero(val);
+                }
+            } else {
+                // Create mask for used bits in last block
+                BlockType mask = (BlockType(1) << used_bits_in_last_block) - 1;
+                BlockType selfMasked = mBlocks[full_blocks] & mask;
+                BlockType otherMasked = other.mBlocks[full_blocks] & mask;
+                BlockType val = selfMasked & otherMasked;
+                if (val > 0) {
+                    return offset + std::countr_zero(val);
+                }
+            }
+        }
+
+        // no matching bits -- return an invalid value
+        return mNumBits + 1;
+    }
+
     // Reset all bits to 0
     void reset() {
         for (size_t i = 0; i < mBlocks.size(); ++i) {
@@ -248,4 +266,21 @@ public:
 
     // Count the number of bits set to 1
     size_t count() const;
+
+private:
+    // Use uint64_t for maximum performance on 64-bit architectures
+    using BlockType = uint64_t;
+    static constexpr size_t BITS_PER_BLOCK = sizeof(BlockType) * CHAR_BIT;
+
+    std::vector<BlockType> mBlocks;
+    size_t mNumBits;
+
+    // Calculate which block a bit is in
+    inline size_t block_index(size_t pos) const { return pos / BITS_PER_BLOCK; }
+
+    // Calculate bit position within a block
+    inline size_t bit_index(size_t pos) const { return pos % BITS_PER_BLOCK; }
+
+    // Create mask for a single bit
+    inline BlockType bit_mask(size_t pos) const { return BlockType(1) << bit_index(pos); }
 };
