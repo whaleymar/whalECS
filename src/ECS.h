@@ -142,6 +142,10 @@ public:
         requires std::invocable<F, Entity, Args...>
     void forChild(F&& callback, bool isRecursive, Args&&... args) const;
 
+    template <typename Trait, typename F, typename... Args>
+        requires std::invocable<F, Entity, Entity, Args...>
+    void forTrait(F&& callback, Args&&... args) const;
+
     Entity parent() const;                                           // parent getter
     const std::unordered_set<Entity, EntityHash>& children() const;  // children getter
     const char* name() const;
@@ -935,16 +939,16 @@ template <typename T>
 Entity Entity::getTraitHolder() const {
     World& world = World::getInstance();
     const Entity traitEntity = world.component<T>();
-    const Pattern& cmpPattern = getPattern();
 
     const internal::TraitUsers* traitUsers = traitEntity.tryGet<internal::TraitUsers>();
     if (!traitUsers) {
         // this trait is not implemented by any components
         return Entity{};
     }
-    const Pattern& traitPattern = traitUsers->componentPattern;
 
     // matchIx > size() if there's no match
+    const Pattern& cmpPattern = getPattern();
+    const Pattern& traitPattern = traitUsers->componentPattern;
     size_t matchIx = traitPattern.getIndexOfFirstMatch(cmpPattern);
     if (matchIx < traitPattern.size()) {
         return world.mComponentManager->getComponentEntity(matchIx);
@@ -981,6 +985,41 @@ void Entity::forChild(F&& callback, bool isRecursive, Args&&... args) const {
         for (const Entity& child : World::getInstance().mEntityManager->getChildren(*this)) {
             callback(child, std::forward<Args>(args)...);
         }
+    }
+}
+
+template <typename Trait, typename F, typename... Args>
+    requires std::invocable<F, Entity, Entity, Args...>
+void Entity::forTrait(F&& callback, Args&&... args) const {
+    World& world = World::getInstance();
+    const Entity traitEntity = world.component<Trait>();
+
+    const internal::TraitUsers* traitUsers = traitEntity.tryGet<internal::TraitUsers>();
+    if (!traitUsers) {
+        // this trait is not implemented by any components
+        return;
+    }
+
+    // matchIx > size() if there's no match
+    const Pattern& traitPattern = traitUsers->componentPattern;
+    Pattern cmpPattern = getPattern();
+    size_t matchIx = traitPattern.getIndexOfFirstMatch(cmpPattern);
+    while (matchIx < traitPattern.size()) {
+        Entity traitHolder = world.mComponentManager->getComponentEntity(matchIx);
+        callback(*this, traitHolder, std::forward<Args>(args)...);
+        cmpPattern.set(matchIx, 0);  // 0 this index and search for the next one
+        matchIx = traitPattern.getIndexOfFirstMatch(cmpPattern);
+    }
+
+    // no match on components. check tags.
+    cmpPattern = getTagPattern();
+    const Pattern& traitTagPattern = traitEntity.getTagPattern();
+    matchIx = traitTagPattern.getIndexOfFirstMatch(cmpPattern);
+    while (matchIx < traitTagPattern.size()) {
+        Entity traitHolder = world.mComponentManager->getTagEntity(matchIx);
+        callback(*this, traitHolder, std::forward<Args>(args)...);
+        cmpPattern.set(matchIx, 0);
+        matchIx = traitTagPattern.getIndexOfFirstMatch(cmpPattern);
     }
 }
 

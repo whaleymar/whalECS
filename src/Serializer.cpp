@@ -5,39 +5,22 @@
 
 namespace whal::ecs {
 
-struct StringKV {
-    std::string key;
-    std::string val;
-    bool isTag;
-};
-
-std::string toString(ecs::Entity e) {
-    std::vector<StringKV> data;
-    ComponentList components = e.getComponents();
+std::string toString(Entity e) {
     // might want unique handling for tags? There no need for them to have non-null callbacks in the serializer
-    for (Entity cmp : components) {
-        Serialize* serde = cmp.tryGet<Serialize>();
-        if (!serde) {
-            continue;
-        }
-        if (cmp.has<internal::Tag>()) {
-            data.push_back({cmp.name(), "", true});
-        } else {
-            data.push_back({cmp.name(), serde->ser(e), false});
-        }
-    }
-
     std::stringstream result;
     result << "Entity::" << e.name() << std::endl;
-    for (const auto& [key, value, isTag] : data) {
-        if (isTag) {
-            result << "Tag::" << key << std::endl;
-        } else {
-            result << "Component::" << key << std::endl;
-            result << value << std::endl;
-            result << "/Component::" << key << std::endl;
-        }
-    }
+    e.forTrait<Serialize>(
+        [](Entity self, Entity cmp, std::stringstream& result) {
+            if (cmp.has<internal::Tag>()) {
+                result << "Tag::" << cmp.name() << std::endl;
+            } else {
+                result << "Component::" << cmp.name() << std::endl;
+                result << cmp.get<Serialize>().ser(self) << std::endl;
+                result << "/Component::" << cmp.name() << std::endl;
+            }
+        },
+        result);
+
     result << "/Entity::" << e.name() << std::endl;
 
     return result.str();
