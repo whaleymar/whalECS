@@ -369,22 +369,13 @@ public:
         return id;
     }
 
-    template <typename T>
-        requires(IsQueryMetaComponent<T>)
-    static inline ComponentType getComponentID() {
-        return T::COMPONENT_TYPE;
-    }
-
     // use a separate ID for tags
     static inline ComponentType TagComponentID = 0;
     template <typename T>
+        requires(!IsQueryMetaComponent<T>)
     static inline ComponentType getTagID() {
-        if constexpr (IsQueryMetaComponent<T>) {
-            return T::COMPONENT_TYPE;
-        } else {
-            static ComponentType id = TagComponentID++;
-            return id;
-        }
+        static ComponentType id = TagComponentID++;
+        return id;
     }
 
     u32 getRegisteredCount() const { return mComponentArrays.size(); }
@@ -421,14 +412,13 @@ private:
 template <typename T>
 class Exclude {
 public:
-    inline static ComponentType COMPONENT_TYPE = std::is_empty_v<T> ? ComponentManager::getTagID<T>() : ComponentManager::getComponentID<T>();
+    using type = T;
 };
 
 template <typename T>
 class MatchTrait {
 public:
     using type = T;
-    inline static ComponentType COMPONENT_TYPE = std::is_empty_v<T> ? ComponentManager::getTagID<T>() : ComponentManager::getComponentID<T>();
 };
 
 class SystemBase {
@@ -483,7 +473,7 @@ public:
         mAntiPattern.resize(MAX_COMPONENTS);
         mTagPattern.resize(MAX_COMPONENTS);
         mTagAntiPattern.resize(MAX_COMPONENTS);
-        InitializeIDs<T...>();
+        (InitializeIDs<T>(), ...);
     }
 
     std::unordered_map<EntityID, Entity>& getEntitiesVirtual() override { return mEntities; }
@@ -514,15 +504,7 @@ public:
     bool isMatch(Entity e) const override { return isPatternInSystem(e.getPattern(), e.getTagPattern()); }
 
 private:
-    // need a First and Second, otherwise there is ambiguity when there's only one
-    // element (InitializeIDs<type> vs InitializeIDs<type, <>>)
-    template <typename First, typename Second, typename... Rest>
-    void InitializeIDs() {
-        InitializeIDs<First>();
-        InitializeIDs<Second, Rest...>();
-    }
-
-    template <typename Last>
+    template <typename Component>
     void InitializeIDs();
 
     inline static std::unordered_map<EntityID, Entity> mEntities = {};
@@ -1058,25 +1040,22 @@ void ComponentManager::registerTag() {
     e.add<internal::Tag>({.id = type});
 }
 
-// TODO
-// the thing I am doing with `typename` with match trait -- do that with all the Exclude fuckery i am doing .
-// ALSO see if I can do the system registration template pattern I am doing to loop types instead of doing this <first, second, ...> shit
 template <typename... T>
-template <typename Last>
+template <typename Component>
 void ISystem<T...>::InitializeIDs() {
-    if constexpr (is_base_of_template<Exclude, Last>::value) {
-        if constexpr (std::is_empty_v<Last>) {
-            mTagAntiPattern.set(ComponentManager::getTagID<Last>());
+    if constexpr (is_base_of_template<Exclude, Component>::value) {
+        if constexpr (std::is_empty_v<Component>) {
+            mTagAntiPattern.set(ComponentManager::getTagID<typename Component::type>());
         } else {
-            mAntiPattern.set(ComponentManager::getComponentID<Last>());
+            mAntiPattern.set(ComponentManager::getComponentID<typename Component::type>());
         }
-    } else if constexpr (is_base_of_template<MatchTrait, Last>::value) {
-        mTraits.push_back(World::getInstance().component<typename Last::type>());
+    } else if constexpr (is_base_of_template<MatchTrait, Component>::value) {
+        mTraits.push_back(World::getInstance().component<typename Component::type>());
     } else {
-        if constexpr (std::is_empty_v<Last>) {
-            mTagPattern.set(ComponentManager::getTagID<Last>());
+        if constexpr (std::is_empty_v<Component>) {
+            mTagPattern.set(ComponentManager::getTagID<Component>());
         } else {
-            mPattern.set(ComponentManager::getComponentID<Last>());
+            mPattern.set(ComponentManager::getComponentID<Component>());
         }
     }
 }
