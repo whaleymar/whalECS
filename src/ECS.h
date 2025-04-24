@@ -122,6 +122,7 @@ public:
     template <typename T>
     const T& getTrait() const;
 
+    // returns the first of this entity's components which implement the trait T.
     template <typename T>
     Entity getTraitHolder() const;
 
@@ -286,6 +287,12 @@ public:
 template <typename T>
 class Exclude;
 
+template <typename T>
+class MatchTrait;
+
+template <typename T>
+concept IsQueryMetaComponent = is_base_of_template<Exclude, T>::value || is_base_of_template<MatchTrait, T>::value;
+
 // This manages all components. For each registered component, it has an array of the component data, as well as an Entity which holds data about the
 // component. For tags, it only has the entities. No data.
 class ComponentManager {
@@ -356,16 +363,14 @@ public:
     // assign unique IDs to each component type
     static inline ComponentType ComponentID = 0;
     template <typename T>
-    // requires(!is_base_of_template<Exclude, T>::value && !std::is_empty_v<T>)
-        requires(!is_base_of_template<Exclude, T>::value)
+        requires(!IsQueryMetaComponent<T>)
     static inline ComponentType getComponentID() {
         static ComponentType id = ComponentID++;
         return id;
     }
 
     template <typename T>
-    // requires(is_base_of_template<Exclude, T>::value && !std::is_empty_v<T>)
-        requires(is_base_of_template<Exclude, T>::value)
+        requires(IsQueryMetaComponent<T>)
     static inline ComponentType getComponentID() {
         return T::COMPONENT_TYPE;
     }
@@ -374,7 +379,7 @@ public:
     static inline ComponentType TagComponentID = 0;
     template <typename T>
     static inline ComponentType getTagID() {
-        if constexpr (is_base_of_template<Exclude, T>::value) {
+        if constexpr (IsQueryMetaComponent<T>) {
             return T::COMPONENT_TYPE;
         } else {
             static ComponentType id = TagComponentID++;
@@ -416,6 +421,13 @@ private:
 template <typename T>
 class Exclude {
 public:
+    inline static ComponentType COMPONENT_TYPE = std::is_empty_v<T> ? ComponentManager::getTagID<T>() : ComponentManager::getComponentID<T>();
+};
+
+template <typename T>
+class MatchTrait {
+public:
+    using type = T;
     inline static ComponentType COMPONENT_TYPE = std::is_empty_v<T> ? ComponentManager::getTagID<T>() : ComponentManager::getComponentID<T>();
 };
 
@@ -480,7 +492,22 @@ public:
     static const std::unordered_map<EntityID, Entity>& getEntities() { return mEntities; }
     static Entity first() { return mEntities.begin()->second; }
     bool isPatternInSystem(const Pattern& pattern, const Pattern& tagPattern) const override {
-        return mPattern.contains(pattern) && mTagPattern.contains(tagPattern) && mAntiPattern.containsNone(pattern) &&
+        // each trait is effectively an OR on a set of components.
+        // to match all traits, we need to match at least one component in each set.
+        bool isTraitsSatisfied = true;
+        for (Entity trait : mTraits) {
+            const internal::TraitUsers* traitUsers = trait.tryGet<internal::TraitUsers>();
+            if (traitUsers) {
+                if (traitUsers->componentPattern.containsNone(pattern) && traitUsers->tagPattern.containsNone(tagPattern)) {
+                    isTraitsSatisfied = false;
+                    break;
+                }
+            } else {
+                isTraitsSatisfied = false;
+                break;
+            }
+        }
+        return isTraitsSatisfied && mPattern.contains(pattern) && mTagPattern.contains(tagPattern) && mAntiPattern.containsNone(pattern) &&
                mTagAntiPattern.containsNone(tagPattern);
     }
 
@@ -491,44 +518,19 @@ private:
     // element (InitializeIDs<type> vs InitializeIDs<type, <>>)
     template <typename First, typename Second, typename... Rest>
     void InitializeIDs() {
-        if constexpr (is_base_of_template<Exclude, First>::value) {
-            if constexpr (std::is_empty_v<First>) {
-                mTagAntiPattern.set(ComponentManager::getTagID<First>());
-            } else {
-                mAntiPattern.set(ComponentManager::getComponentID<First>());
-            }
-        } else {
-            if constexpr (std::is_empty_v<First>) {
-                mTagPattern.set(ComponentManager::getTagID<First>());
-            } else {
-                mPattern.set(ComponentManager::getComponentID<First>());
-            }
-        }
+        InitializeIDs<First>();
         InitializeIDs<Second, Rest...>();
     }
 
     template <typename Last>
-    void InitializeIDs() {
-        if constexpr (is_base_of_template<Exclude, Last>::value) {
-            if constexpr (std::is_empty_v<Last>) {
-                mTagAntiPattern.set(ComponentManager::getTagID<Last>());
-            } else {
-                mAntiPattern.set(ComponentManager::getComponentID<Last>());
-            }
-        } else {
-            if constexpr (std::is_empty_v<Last>) {
-                mTagPattern.set(ComponentManager::getTagID<Last>());
-            } else {
-                mPattern.set(ComponentManager::getComponentID<Last>());
-            }
-        }
-    }
+    void InitializeIDs();
 
     inline static std::unordered_map<EntityID, Entity> mEntities = {};
     Pattern mPattern;
     Pattern mAntiPattern;
     Pattern mTagPattern;
     Pattern mTagAntiPattern;
+    std::vector<Entity> mTraits;
 };
 
 // i fucking love concepts
@@ -1054,6 +1056,29 @@ void ComponentManager::registerTag() {
     // must add these *after* setting mTagEntities, otherwise will infinitely recurse
     e.add<internal::Component>({.id = MAX_COMPONENTS + 1});
     e.add<internal::Tag>({.id = type});
+}
+
+// TODO
+// the thing I am doing with `typename` with match trait -- do that with all the Exclude fuckery i am doing .
+// ALSO see if I can do the system registration template pattern I am doing to loop types instead of doing this <first, second, ...> shit
+template <typename... T>
+template <typename Last>
+void ISystem<T...>::InitializeIDs() {
+    if constexpr (is_base_of_template<Exclude, Last>::value) {
+        if constexpr (std::is_empty_v<Last>) {
+            mTagAntiPattern.set(ComponentManager::getTagID<Last>());
+        } else {
+            mAntiPattern.set(ComponentManager::getComponentID<Last>());
+        }
+    } else if constexpr (is_base_of_template<MatchTrait, Last>::value) {
+        mTraits.push_back(World::getInstance().component<typename Last::type>());
+    } else {
+        if constexpr (std::is_empty_v<Last>) {
+            mTagPattern.set(ComponentManager::getTagID<Last>());
+        } else {
+            mPattern.set(ComponentManager::getComponentID<Last>());
+        }
+    }
 }
 
 }  // namespace whal::ecs
