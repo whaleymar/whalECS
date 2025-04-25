@@ -38,9 +38,10 @@ void Entity::addChild(ecs::Entity child) const {
     pEM->childToParent[child] = *this;
     pEM->parentToChildren[oldParent].erase(child);
     pEM->parentToChildren[*this].insert(child);
-    if (isValid() && child.isValid() && world.mAdoptCallback) {
+    if (child.isValid() && world.mAdoptCallback) {
         world.mAdoptCallback(child, *this);
     }
+    world.mSystemManager->onEntityParentChanged(child);
 }
 
 ecs::Entity Entity::createChild(bool isActive) const {
@@ -74,12 +75,7 @@ void Entity::orphan() const {
         return;
     }
 
-    pEM->childToParent[*this] = world.mRootEntity;
-
-    // there are no guarantees on which order parents/children are deleted if the deletes happen on the same frame.
-    // BUT i don't think I touch a parent's list of children when it dies, so this should be fine?
-    pEM->parentToChildren[oldParent].erase(*this);
-    pEM->parentToChildren[world.mRootEntity].insert(*this);
+    world.mRootEntity.addChild(*this);
 }
 
 Entity Entity::parent() const {

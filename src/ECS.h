@@ -647,6 +647,7 @@ public:
     void autoUpdate();
     void onEntityDestroyed(const Entity entity) const;
     void onEntityPatternChanged(const Entity entity, const Pattern& newEntityPattern, const Pattern& newEntityTagPattern) const;
+    void onEntityParentChanged(const Entity entity);
     void onPaused();
     void onUnpaused();
 
@@ -664,6 +665,9 @@ private:
         SystemId id = getSystemID<T>();
         return mSystemIdToIndex[id];
     }
+
+    void checkIfInSystem(Entity entity, SystemBase* system, size_t systemIx, const Pattern& entityPattern, const Pattern& tagPattern,
+                         bool isEntityInSystem) const;
 
     std::vector<long> mSystemIdToIndex;
     std::vector<SystemBase*> mSystems;

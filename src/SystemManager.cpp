@@ -59,35 +59,50 @@ static void tryRemoveFromSystem(Entity entity, SystemBase* system, IMonitorSyste
     }
 }
 
+void SystemManager::checkIfInSystem(Entity entity, SystemBase* system, size_t i, const Pattern& newEntityPattern, const Pattern& newTagPattern,
+                                    bool isEntityInSystem) const {
+    bool isExcluded = (mAttributes[i] & ExcludeChildren) > 0 && system->isMatch(entity.parent());
+    bool isPatternMatch = system->isPatternInSystem(newEntityPattern, newTagPattern);
+    if (isPatternMatch && !isExcluded) {
+        if (isEntityInSystem) {
+            return;
+        }
+        assert((!((mAttributes[i] & Attributes::UniqueEntity) > 0) || system->getEntitiesVirtual().size() < 1) &&
+               "Trying to assign more than one entity to system with UniqueEntity attribute");
+        system->getEntitiesVirtual().insert({entity.id(), entity});
+        if (mMonitorSystems[i] != nullptr) {
+            mMonitorSystems[i]->onAdd(entity);
+        }
+
+        if ((mAttributes[i] & ExcludeChildren) > 0) {
+            // now that this entity is added, make sure its children aren't in this system
+            entity.forChild(tryRemoveFromSystem, false, system, mMonitorSystems[i]);
+        }
+    } else if (isEntityInSystem) {
+        if (mMonitorSystems[i] != nullptr) {
+            mMonitorSystems[i]->onRemove(entity);
+        }
+        system->getEntitiesVirtual().erase(entity.id());
+    }
+}
+
 void SystemManager::onEntityPatternChanged(const Entity entity, const Pattern& newEntityPattern, const Pattern& newTagPattern) const {
     // TODO make thread safe
     for (size_t i = 0; i < mSystems.size(); i++) {
         SystemBase* system = mSystems[i];
-        auto const ix = system->getEntitiesVirtual().find(entity.id());
-        bool isExcluded = (mAttributes[i] & ExcludeChildren) > 0 && system->isMatch(entity.parent());
-        bool isPatternMatch = system->isPatternInSystem(newEntityPattern, newTagPattern);
-        if (isPatternMatch && !isExcluded) {
-            if (ix != system->getEntitiesVirtual().end()) {
-                // already in system
-                continue;
-            }
-            assert((!((mAttributes[i] & Attributes::UniqueEntity) > 0) || system->getEntitiesVirtual().size() < 1) &&
-                   "Trying to assign more than one entity to system with UniqueEntity attribute");
-            system->getEntitiesVirtual().insert({entity.id(), entity});
-            if (mMonitorSystems[i] != nullptr) {
-                mMonitorSystems[i]->onAdd(entity);
-            }
+        auto const it = system->getEntitiesVirtual().find(entity.id());
+        checkIfInSystem(entity, system, i, newEntityPattern, newTagPattern, it != system->getEntitiesVirtual().end());
+    }
+}
 
-            if ((mAttributes[i] & ExcludeChildren) > 0) {
-                // now that this entity is added, make sure its children aren't in this system
-                entity.forChild(tryRemoveFromSystem, false, system, mMonitorSystems[i]);
-            }
-        } else if (ix != system->getEntitiesVirtual().end()) {
-            if (mMonitorSystems[i] != nullptr) {
-                mMonitorSystems[i]->onRemove(entity);
-            }
-            system->getEntitiesVirtual().erase(entity.id());
+void SystemManager::onEntityParentChanged(const Entity entity) {
+    for (size_t i = 0; i < mSystems.size(); i++) {
+        SystemBase* system = mSystems[i];
+        if ((mAttributes[i] & ExcludeChildren) == 0) {
+            continue;
         }
+        auto const it = system->getEntitiesVirtual().find(entity.id());
+        checkIfInSystem(entity, system, i, entity.getPattern(), entity.getTagPattern(), it != system->getEntitiesVirtual().end());
     }
 }
 
