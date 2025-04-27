@@ -64,6 +64,10 @@ struct TraitUsers {
 
 }  // namespace internal
 
+// Tags used by the ECS World
+
+struct OverrideAttributeIgnoreChildren {};
+
 class Entity {
 public:
     Entity() = default;
@@ -128,8 +132,8 @@ public:
 
     Entity copy(bool isActive = true) const;
 
-    void activate() const;
-    void deactivate() const;
+    Entity activate() const;
+    Entity deactivate() const;
     void kill() const;
     bool isValid() const;
     bool isKilledThisFrame() const;

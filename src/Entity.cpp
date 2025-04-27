@@ -13,12 +13,14 @@ void Entity::kill() const {
     World::getInstance().kill(*this);
 }
 
-void Entity::activate() const {
+Entity Entity::activate() const {
     World::getInstance().activate(*this);
+    return *this;
 }
 
-void Entity::deactivate() const {
+Entity Entity::deactivate() const {
     World::getInstance().deactivate(*this);
+    return *this;
 }
 
 bool Entity::isValid() const {

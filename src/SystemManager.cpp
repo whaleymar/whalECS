@@ -49,19 +49,22 @@ void SystemManager::onEntityDestroyed(const Entity entity) const {
     }
 }
 
-static void tryRemoveFromSystem(Entity entity, SystemBase* system, IMonitorSystem* pMonitor) {
+static void tryRemoveChild(Entity entity, SystemBase* system, IMonitorSystem* pMonitor) {
+    if (entity.has<OverrideAttributeIgnoreChildren>()) {
+        return;
+    }
     auto it = system->getEntitiesVirtual().find(entity.id());
     if (it != system->getEntitiesVirtual().end()) {
         if (pMonitor)
             pMonitor->onRemove(entity);
         system->getEntitiesVirtual().erase(it);
-        entity.forChild(tryRemoveFromSystem, false, system, pMonitor);
+        entity.forChild(tryRemoveChild, false, system, pMonitor);
     }
 }
 
 void SystemManager::checkIfInSystem(Entity entity, SystemBase* system, size_t i, const Pattern& newEntityPattern, const Pattern& newTagPattern,
                                     bool isEntityInSystem) const {
-    bool isExcluded = (mAttributes[i] & ExcludeChildren) > 0 && system->isMatch(entity.parent());
+    bool isExcluded = (mAttributes[i] & ExcludeChildren) > 0 && !entity.has<OverrideAttributeIgnoreChildren>() && system->isMatch(entity.parent());
     bool isPatternMatch = system->isPatternInSystem(newEntityPattern, newTagPattern);
     if (isPatternMatch && !isExcluded) {
         if (isEntityInSystem) {
@@ -76,7 +79,7 @@ void SystemManager::checkIfInSystem(Entity entity, SystemBase* system, size_t i,
 
         if ((mAttributes[i] & ExcludeChildren) > 0) {
             // now that this entity is added, make sure its children aren't in this system
-            entity.forChild(tryRemoveFromSystem, false, system, mMonitorSystems[i]);
+            entity.forChild(tryRemoveChild, false, system, mMonitorSystems[i]);
         }
     } else if (isEntityInSystem) {
         if (mMonitorSystems[i] != nullptr) {
